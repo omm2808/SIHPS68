@@ -1,16 +1,22 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import SubpageNavBar from './components/SubpageNavBar';
+import WeatherBackground from './components/WeatherBackground';
 import HomePage from './pages/HomePage';
 import SearchPage from './pages/SearchPage';
 import WeatherGPTPage from './pages/WeatherGPTPage';
 import AgriculturePage from './pages/AgriculturePage';
 import SettingsPage from './pages/SettingsPage';
+import { useLiquidGlassPointer } from './hooks/useLiquidGlassPointer';
 import './App.css';
 
 import { SettingsProvider } from './context/SettingsContext';
+import { WeatherProvider } from './context/WeatherContext';
 
 function App() {
+  // Activate dynamic cursor specular light following effect across all liquid glass blocks
+  useLiquidGlassPointer();
+
   const [page, setPage] = useState(() => {
     const hash = window.location.hash.replace('#', '');
     return ['search', 'weathergpt', 'agriculture', 'settings'].includes(hash) ? hash : 'home';
@@ -83,23 +89,26 @@ function App() {
 
   return (
     <SettingsProvider>
-      <div className="app-shell">
-        <Sidebar
-          activePage={page}
-          onNavigate={navigateTo}
-        />
-        <main className="app-content">
-          {page !== 'home' && (
-            <SubpageNavBar
-              currentPage={page}
-              previousPage={previousPage}
-              onNavigateBack={navigateBack}
-              onNavigateHome={() => navigateTo('home')}
-            />
-          )}
-          {renderPage()}
-        </main>
-      </div>
+      <WeatherProvider>
+        <div className="app-shell">
+          <WeatherBackground />
+          <Sidebar
+            activePage={page}
+            onNavigate={navigateTo}
+          />
+          <main className="app-content">
+            {page !== 'home' && (
+              <SubpageNavBar
+                currentPage={page}
+                previousPage={previousPage}
+                onNavigateBack={navigateBack}
+                onNavigateHome={() => navigateTo('home')}
+              />
+            )}
+            {renderPage()}
+          </main>
+        </div>
+      </WeatherProvider>
     </SettingsProvider>
   );
 }

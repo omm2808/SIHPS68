@@ -7,43 +7,19 @@ import HourlyTimeline from '../components/HourlyTimeline';
 import MapView from '../components/MapView';
 import useWeather from '../hooks/useWeather';
 import { useSettings } from '../context/SettingsContext';
+import { KNOWN_COORDS, geocodeLocation } from '../utils/knownCoords';
+
+import { useGlobalWeather } from '../context/WeatherContext';
 
 const POPULAR = [
   'Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Chennai',
   'Kolkata', 'Pune', 'Jaipur', 'Ahmedabad', 'Bhopal', 'Indore',
 ];
 
-const KNOWN_COORDS = {
-  delhi: { lat: 28.6139, lon: 77.2090 },
-  newdelhi: { lat: 28.6139, lon: 77.2090 },
-  mumbai: { lat: 19.0760, lon: 72.8777 },
-  bangalore: { lat: 12.9716, lon: 77.5946 },
-  bengaluru: { lat: 12.9716, lon: 77.5946 },
-  hyderabad: { lat: 17.3850, lon: 78.4867 },
-  chennai: { lat: 13.0827, lon: 80.2707 },
-  kolkata: { lat: 22.5726, lon: 88.3639 },
-  pune: { lat: 18.5204, lon: 73.8567 },
-  jaipur: { lat: 26.9124, lon: 75.7873 },
-  ahmedabad: { lat: 23.0225, lon: 72.5714 },
-  bhopal: { lat: 23.2599, lon: 77.4126 },
-  indore: { lat: 22.7196, lon: 75.8577 },
-  lucknow: { lat: 26.8467, lon: 80.9462 },
-  patna: { lat: 25.5941, lon: 85.1376 },
-  chandigarh: { lat: 30.7333, lon: 76.7794 },
-  surat: { lat: 21.1702, lon: 72.8311 },
-  nagpur: { lat: 21.1458, lon: 79.0882 },
-  kochi: { lat: 9.9312, lon: 76.2673 },
-  coimbatore: { lat: 11.0168, lon: 76.9558 },
-  visakhapatnam: { lat: 17.6868, lon: 83.2185 },
-  varanasi: { lat: 25.3176, lon: 82.9739 },
-  srinagar: { lat: 34.0837, lon: 74.7973 },
-  amritsar: { lat: 31.6340, lon: 74.8723 },
-  goa: { lat: 15.2993, lon: 74.1240 },
-};
-
 export default function SearchPage() {
+  const { fetchWeatherForLocation, locationName: globalLocationName } = useGlobalWeather();
   const [location, setLocation] = useState('');
-  const [submitted, setSubmitted] = useState('');
+  const [submitted, setSubmitted] = useState(globalLocationName || '');
   const [coords, setCoords] = useState(null);
   const [forecastDays, setForecastDays] = useState(7);
 
@@ -54,6 +30,7 @@ export default function SearchPage() {
     if (!cityName || !cityName.trim()) return;
     const name = cityName.trim();
     setSubmitted(name);
+    fetchWeatherForLocation(name);
 
     const clean = name.toLowerCase().replace(/\s+/g, '');
     if (KNOWN_COORDS[clean]) {
@@ -62,15 +39,9 @@ export default function SearchPage() {
     }
 
     try {
-      const res = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1`
-      );
-      const data = await res.json();
-      if (data.results && data.results.length > 0) {
-        setCoords({
-          lat: data.results[0].latitude,
-          lon: data.results[0].longitude,
-        });
+      const resolved = await geocodeLocation(name);
+      if (resolved) {
+        setCoords({ lat: resolved.lat, lon: resolved.lon });
       }
     } catch (e) {
       console.warn('Geocoding error:', e);
@@ -92,7 +63,7 @@ export default function SearchPage() {
         setCoords({ lat, lon });
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`
           );
           const d = await res.json();
           const name =
@@ -109,7 +80,11 @@ export default function SearchPage() {
           setSubmitted('My Location');
         }
       },
-      (err) => console.warn('Locate device error:', err)
+      (err) => {
+        setLocation('My Location');
+        setSubmitted('My Location');
+      },
+      { timeout: 8000, enableHighAccuracy: true }
     );
   };
 

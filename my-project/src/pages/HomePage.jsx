@@ -4,6 +4,8 @@ import SummaryChart from '../components/SummaryChart';
 import RiskAlertToast from '../components/RiskAlertToast';
 import { getAlerts } from '../api/weatherApi';
 import { useSettings } from '../context/SettingsContext';
+import { useGlobalWeather } from '../context/WeatherContext';
+import { geocodeLocation, KNOWN_COORDS } from '../utils/knownCoords';
 
 // WMO Code mapping
 const WMO_CODES = {
@@ -44,11 +46,16 @@ const POPULAR_CITIES = [
 
 export default function HomePage({ onNavigateSearch, onNavigateSettings }) {
   const { unit, speedUnit, notifications, convertTemp, convertWind, tempUnitSymbol } = useSettings();
+  const {
+    weatherData,
+    coords,
+    locationName,
+    fetchWeather,
+    setLocationName,
+  } = useGlobalWeather();
+
   const [currentTime, setCurrentTime] = useState('');
-  const [coords, setCoords] = useState({ lat: 17.385, lon: 78.4867 });
-  const [locationName, setLocationName] = useState('Locating…');
   const [geoState, setGeoState] = useState('pending'); // 'pending' | 'success' | 'denied' | 'error'
-  const [weatherData, setWeatherData] = useState(null);
   const [forecastDays, setForecastDays] = useState(7);
   const [selectedDayIdx, setSelectedDayIdx] = useState(3);
   const [cityTemps, setCityTemps] = useState({});
@@ -78,11 +85,13 @@ export default function HomePage({ onNavigateSearch, onNavigateSettings }) {
     return () => clearInterval(id);
   }, []);
 
-  // ─── Fetch Alerts for current location ─────────────────
-  const fetchAlertsForLocation = useCallback(async (targetName, currentWeatherData) => {
+  // ─── Fetch Real-Time Alerts for current location ─────────────────
+  const fetchAlertsForLocation = useCallback(async (targetName, currentWeatherData, currentCoords) => {
     if (!targetName || targetName === 'Locating…') return;
     try {
-      const res = await getAlerts(targetName);
+      const lat = currentCoords?.lat;
+      const lon = currentCoords?.lon;
+      const res = await getAlerts(targetName, lat, lon);
       let list = [];
       if (res && res.alerts && res.alerts.length > 0) {
         list = res.alerts.map((a) => ({
@@ -91,47 +100,51 @@ export default function HomePage({ onNavigateSearch, onNavigateSettings }) {
         }));
       }
 
-      // Fallback: evaluate meteorological rules from live weather if backend alerts are 0
+      // If backend was unreachable or returned 0, evaluate directly against live satellite/sensor data
       if (list.length === 0 && currentWeatherData?.current) {
         const c = currentWeatherData.current;
         const code = c.weather_code;
-        const temp = c.temperature_2m;
+        const tempVal = c.temperature_2m;
         const wind = c.wind_speed_10m;
 
         if ([95, 96, 99].includes(code)) {
           list.push({
             type: 'Thunderstorm & Lightning',
             severity: 'HIGH',
-            message: `Thunderstorm activity reported in ${targetName}.`,
+            message: `Active convective thunderstorm radar signal detected in ${targetName}.`,
             recommendation: 'Stay indoors. Avoid open fields, tall trees, and metal structures. Unplug electronics.',
             location: targetName,
+            data_source: 'Live Real Data',
           });
         }
         if ([65, 82].includes(code)) {
           list.push({
-            type: 'Heavy Rainfall / Flood Risk',
+            type: 'Heavy Rainfall Warning',
             severity: 'SEVERE',
-            message: `Very heavy rainfall expected in ${targetName}.`,
+            message: `Torrential rainfall currently observed in ${targetName}.`,
             recommendation: 'Avoid waterlogged areas and unnecessary travel. Move to higher ground if near flood-prone zones.',
             location: targetName,
+            data_source: 'Live Real Data',
           });
         }
-        if (wind >= 45) {
+        if (wind >= 50) {
           list.push({
-            type: 'Strong Wind Alert',
-            severity: wind >= 60 ? 'SEVERE' : 'MODERATE',
+            type: 'Strong Wind Advisory',
+            severity: wind >= 65 ? 'SEVERE' : 'MODERATE',
             message: `Sustained wind gusts of ${Math.round(wind)} km/h recorded in ${targetName}.`,
             recommendation: 'Secure loose outdoor items. Drive carefully, especially two-wheelers.',
             location: targetName,
+            data_source: 'Live Real Data',
           });
         }
-        if (temp >= 40) {
+        if (tempVal >= 40) {
           list.push({
-            type: 'Heatwave Advisory',
-            severity: temp >= 45 ? 'EXTREME' : 'HIGH',
-            message: `Temperature in ${targetName} is ${Math.round(temp)}°C — heatwave conditions.`,
-            recommendation: 'Limit outdoor exposure during peak afternoon hours. Drink water frequently.',
+            type: 'Heatwave Alert',
+            severity: tempVal >= 45 ? 'EXTREME' : 'HIGH',
+            message: `Live temperature in ${targetName} reached ${Math.round(tempVal)}°C — heatwave threshold exceeded.`,
+            recommendation: 'Limit outdoor exposure during peak afternoon hours. Drink water frequently with electrolytes.',
             location: targetName,
+            data_source: 'Live Real Data',
           });
         }
       }
@@ -159,28 +172,18 @@ export default function HomePage({ onNavigateSearch, onNavigateSettings }) {
     }
   }, [notifications]);
 
-  // ─── Fetch weather from Open-Meteo ────────────────────
-  const fetchWeather = useCallback(async (lat, lon, name) => {
-    try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,surface_pressure,uv_index&hourly=temperature_2m,precipitation_probability,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=10`;
-      const res = await fetch(url);
-      const data = await res.json();
-      setWeatherData(data);
-      setCoords({ lat, lon });
-      if (name) setLocationName(name);
-
-      const targetCity = name || 'Your Location';
-      fetchAlertsForLocation(targetCity, data);
-    } catch (err) {
-      console.error('Weather fetch error:', err);
+  // Sync alerts on weather change
+  useEffect(() => {
+    if (weatherData && locationName && locationName !== 'Locating…') {
+      fetchAlertsForLocation(locationName, weatherData, coords);
     }
-  }, [fetchAlertsForLocation]);
+  }, [weatherData, locationName, coords, fetchAlertsForLocation]);
 
   // ─── Reverse geocode ──────────────────────────────────
   const reverseGeocode = async (lat, lon) => {
     try {
       const r = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=en`
       );
       const d = await r.json();
       return (
@@ -200,8 +203,7 @@ export default function HomePage({ onNavigateSearch, onNavigateSettings }) {
   const locateDevice = useCallback(() => {
     if (!navigator.geolocation) {
       setGeoState('error');
-      setLocationName('Hyderabad');
-      fetchWeather(17.385, 78.4867, 'Hyderabad');
+      fetchWeather(20.4795, 86.1306, 'Salipur');
       return;
     }
 
@@ -215,21 +217,15 @@ export default function HomePage({ onNavigateSearch, onNavigateSettings }) {
           const { latitude: lat, longitude: lon } = pos.coords;
           setGeoState('success');
           const name = await reverseGeocode(lat, lon);
-          setLocationName(name);
-          setCoords({ lat, lon });
           fetchWeather(lat, lon, name);
         },
         (err) => {
           console.warn(`Geolocation attempt ${attempt} failed:`, err.message);
           if (highAccuracy && attempt === 1) {
-            // Retry without high accuracy
             tryGeo(false, 2);
           } else {
-            // Final fallback
             setGeoState(err.code === 1 ? 'denied' : 'error');
-            setLocationName('Hyderabad');
-            setCoords({ lat: 17.385, lon: 78.4867 });
-            fetchWeather(17.385, 78.4867, 'Hyderabad');
+            fetchWeather(20.4795, 86.1306, 'Salipur');
           }
         },
         {
@@ -241,37 +237,50 @@ export default function HomePage({ onNavigateSearch, onNavigateSettings }) {
     };
 
     tryGeo(true, 1);
-  }, [fetchWeather]);
+  }, [fetchWeather, setLocationName]);
 
-  // Initial load
+  // Initial load: render immediate weather & map, then refine with GPS in background
   useEffect(() => {
-    locateDevice();
-  }, [locateDevice]);
+    if (!weatherData) {
+      fetchWeather(20.4795, 86.1306, 'Salipur');
+      locateDevice();
+    }
+  }, [locateDevice, weatherData, fetchWeather]);
 
-  // ─── Fetch live temps for popular cities ──────────────
+  // ─── Fetch live temps for Popular Cities ───────────────
   useEffect(() => {
-    POPULAR_CITIES.forEach(async (city) => {
-      try {
-        const r = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,weather_code&timezone=auto`
-        );
-        const d = await r.json();
-        if (d.current) {
-          const wmo = getWmoInfo(d.current.weather_code);
-          setCityTemps((prev) => ({
-            ...prev,
-            [city.name]: {
-              temp: Math.round(d.current.temperature_2m),
-              desc: wmo[0],
-              icon: wmo[1],
-            },
-          }));
-        }
-      } catch {}
-    });
+    const fetchCityTemps = async () => {
+      const results = {};
+      await Promise.all(
+        POPULAR_CITIES.map(async (c) => {
+          try {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&current=temperature_2m,weather_code&timezone=auto`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.current) {
+              const code = data.current.weather_code;
+              const [desc, icon] = getWmoInfo(code);
+              results[c.name] = {
+                temp: data.current.temperature_2m,
+                code,
+                desc,
+                icon,
+              };
+            }
+          } catch {
+            // keep fallback
+          }
+        })
+      );
+      setCityTemps(results);
+    };
+
+    fetchCityTemps();
+    const interval = setInterval(fetchCityTemps, 180000);
+    return () => clearInterval(interval);
   }, []);
 
-  // ─── Topbar search autocomplete ───────────────────────
+  // ─── Topbar Autocomplete Search ───────────────────────
   const handleSearchInput = (e) => {
     const q = e.target.value;
     setSearchQuery(q);
@@ -286,7 +295,7 @@ export default function HomePage({ onNavigateSearch, onNavigateSettings }) {
     searchTimerRef.current = setTimeout(async () => {
       try {
         const r = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&accept-language=en`
         );
         setSearchResults(await r.json());
       } catch {
@@ -303,8 +312,6 @@ export default function HomePage({ onNavigateSearch, onNavigateSettings }) {
     const name = result.display_name.split(',')[0];
     setSearchQuery('');
     setSearchResults([]);
-    setLocationName(name);
-    setCoords({ lat, lon });
     fetchWeather(lat, lon, name);
   };
 

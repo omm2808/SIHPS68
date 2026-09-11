@@ -47,8 +47,13 @@ export const sendChat = (message, language = 'en') =>
   });
 
 // ── Alerts ──────────────────────────────────────────────
-export const getAlerts = (location = 'Indore') =>
-  request(`/alerts?location=${encodeURIComponent(location)}`);
+export const getAlerts = (location = 'Indore', lat = null, lon = null) => {
+  let url = `/alerts?location=${encodeURIComponent(location)}`;
+  if (lat !== null && lon !== null && !isNaN(lat) && !isNaN(lon)) {
+    url += `&lat=${lat}&lon=${lon}`;
+  }
+  return request(url);
+};
 
 // ── Agriculture ─────────────────────────────────────────
 export const getAgricultureAdvisory = (crop, location, language = 'en') =>

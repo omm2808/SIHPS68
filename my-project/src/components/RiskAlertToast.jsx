@@ -63,7 +63,7 @@ function getHazardIcon(type) {
  * 
  * Floating right-top corner popup toast for active weather hazards.
  * Automatically disappears after `duration` ms with smooth animations,
- * but keeps alerts safely saved in the notification panel.
+ * without pausing on pointer hover.
  */
 export default function RiskAlertToast({
   alert,
@@ -73,39 +73,21 @@ export default function RiskAlertToast({
   onOpenPanel,
 }) {
   const [isExiting, setIsExiting] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [remainingTime, setRemainingTime] = useState(duration);
-  const startTimeRef = useRef(Date.now());
   const timerRef = useRef(null);
 
   const cfg = SEVERITY_CONFIG[alert?.severity] || SEVERITY_CONFIG.HIGH;
   const icon = getHazardIcon(alert?.type);
   const location = alert?.location || 'Current Area';
 
-  // Handle countdown timer with pause on hover
+  // Continuous auto-close timer without pausing on hover
   useEffect(() => {
-    if (isPaused) return;
-
     const timer = setTimeout(() => {
       triggerExit();
-    }, remainingTime);
+    }, duration);
 
     timerRef.current = timer;
-    startTimeRef.current = Date.now();
-
     return () => clearTimeout(timer);
-  }, [isPaused, remainingTime]);
-
-  const handleMouseEnter = () => {
-    setIsPaused(true);
-    const elapsed = Date.now() - startTimeRef.current;
-    setRemainingTime((prev) => Math.max(prev - elapsed, 1000));
-    clearTimeout(timerRef.current);
-  };
-
-  const handleMouseLeave = () => {
-    setIsPaused(false);
-  };
+  }, [duration]);
 
   const triggerExit = () => {
     setIsExiting(true);
@@ -119,14 +101,11 @@ export default function RiskAlertToast({
   return (
     <div
       className={`risk-alert-toast ${isExiting ? 'toast-exit' : 'toast-enter'}`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
       style={{
         '--alert-color': cfg.color,
         '--alert-glow': cfg.glow,
         '--alert-border': cfg.border,
         '--toast-duration': `${duration}ms`,
-        animationPlayState: isPaused ? 'paused' : 'running',
       }}
       role="alert"
       aria-live="assertive"
@@ -196,9 +175,7 @@ export default function RiskAlertToast({
           <span className="toast-arrow">→</span>
         </button>
 
-        <span className="toast-timer-hint">
-          {isPaused ? 'Paused' : 'Auto-closing'}
-        </span>
+        <span className="toast-timer-hint">Auto-closing</span>
       </div>
 
       {/* Shrinking Countdown Progress Bar */}
@@ -208,7 +185,6 @@ export default function RiskAlertToast({
           style={{
             background: cfg.color,
             animationDuration: `${duration}ms`,
-            animationPlayState: isPaused ? 'paused' : 'running',
           }}
         />
       </div>

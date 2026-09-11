@@ -36,8 +36,15 @@ for candidate in [
 CONDITIONS = ["Clear", "Partly Cloudy", "Cloudy", "Light Rain", "Moderate Rain", "Thunderstorm", "Haze"]
 
 CITY_COORDS = {
+    "salipur": (20.4795, 86.1306),
+    "salepur": (20.4795, 86.1306),
+    "cuttack": (20.4625, 85.8828),
+    "bhubaneswar": (20.2961, 85.8245),
+    "puri": (19.8135, 85.8312),
+    "rourkela": (22.2604, 84.8536),
     "indore": (22.7196, 75.8577),
     "delhi": (28.6139, 77.2090),
+    "newdelhi": (28.6139, 77.2090),
     "mumbai": (19.0760, 72.8777),
     "bhopal": (23.2599, 77.4126),
     "jaipur": (26.9124, 75.7873),
@@ -51,6 +58,12 @@ CITY_COORDS = {
     "lucknow": (26.8467, 80.9462),
     "patna": (25.5941, 85.1376),
     "chandigarh": (30.7333, 76.7794),
+    "surat": (21.1702, 72.8311),
+    "nagpur": (21.1458, 79.0882),
+    "kochi": (9.9312, 76.2673),
+    "coimbatore": (11.0168, 76.9558),
+    "visakhapatnam": (17.6868, 83.2185),
+    "varanasi": (25.3176, 82.9739),
 }
 
 WMO_CODE_MAP = {
@@ -136,15 +149,25 @@ class RealWeatherProvider(WeatherProvider):
 
         raise ValueError(f"Location '{location}' could not be resolved via OpenWeatherMap geocoding")
 
-    async def get_current(self, location: str) -> dict:
+    async def get_current(self, location: str, lat: float = None, lon: float = None) -> dict:
         api_key = self._get_api_key()
         async with httpx.AsyncClient(timeout=10) as client:
-            lat, lon = await self._get_coords(client, location)
+            if lat is None or lon is None:
+                lat, lon = await self._get_coords(client, location)
             resp = await client.get(f"{self.BASE_URL}/weather", params={
                 "lat": lat, "lon": lon, "appid": api_key, "units": "metric"
             })
             resp.raise_for_status()
             d = resp.json()
+            tz_offset = d.get("timezone", 19800)
+            if tz_offset == 0 and 68 <= lon <= 97 and 6 <= lat <= 38:
+                tz_offset = 19800
+
+            sunrise_ts = d.get("sys", {}).get("sunrise")
+            sunset_ts = d.get("sys", {}).get("sunset")
+            sunrise = datetime.utcfromtimestamp(sunrise_ts + tz_offset).strftime("%H:%M") if sunrise_ts else "05:45"
+            sunset = datetime.utcfromtimestamp(sunset_ts + tz_offset).strftime("%H:%M") if sunset_ts else "18:15"
+
             return {
                 "location": location.title(),
                 "timestamp": datetime.utcnow().isoformat(),
@@ -156,9 +179,10 @@ class RealWeatherProvider(WeatherProvider):
                 "pressure": d["main"]["pressure"],
                 "visibility": round(d.get("visibility", 10000) / 1000, 1),
                 "condition": d["weather"][0]["main"],
-                "rain_probability": 0,
-                "sunrise": datetime.utcfromtimestamp(d["sys"]["sunrise"]).strftime("%H:%M"),
-                "sunset": datetime.utcfromtimestamp(d["sys"]["sunset"]).strftime("%H:%M"),
+                "rain_probability": int(d.get("clouds", {}).get("all", 0)),
+                "rainfall_mm": round(d.get("rain", {}).get("1h", 0), 1),
+                "sunrise": sunrise,
+                "sunset": sunset,
                 "data_source": "OpenWeatherMap (Live)",
             }
 
@@ -228,25 +252,28 @@ class OpenMeteoWeatherProvider(WeatherProvider):
             return CITY_COORDS[loc_lower]
 
         try:
-            resp = await client.get(self.GEO_URL, params={"name": loc_clean, "count": 1})
+            resp = await client.get(self.GEO_URL, params={"name": loc_clean, "count": 10, "language": "en"})
             if resp.status_code == 200:
                 data = resp.json()
                 if "results" in data and len(data["results"]) > 0:
-                    return data["results"][0]["latitude"], data["results"][0]["longitude"]
+                    in_match = next((r for r in data["results"] if r.get("country_code") == "IN"), None)
+                    chosen = in_match or data["results"][0]
+                    return chosen["latitude"], chosen["longitude"]
         except Exception:
             pass
 
         # Fallback to Indore coords if city is completely unknown
         return CITY_COORDS.get("indore", (22.7196, 75.8577))
 
-    async def get_current(self, location: str) -> dict:
+    async def get_current(self, location: str, lat: float = None, lon: float = None) -> dict:
         async with httpx.AsyncClient(timeout=10) as client:
-            lat, lon = await self._get_coords(client, location)
+            if lat is None or lon is None:
+                lat, lon = await self._get_coords(client, location)
             params = {
                 "latitude": lat,
                 "longitude": lon,
                 "current": "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m",
-                "daily": "sunrise,sunset",
+                "daily": "sunrise,sunset,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,temperature_2m_max,temperature_2m_min",
                 "timezone": "auto",
             }
             resp = await client.get(self.WEATHER_URL, params=params)
@@ -259,6 +286,12 @@ class OpenMeteoWeatherProvider(WeatherProvider):
             condition = WMO_CODE_MAP.get(condition_code, "Clear")
             sunrise = (daily.get("sunrise", ["06:00"])[0]).split("T")[-1][:5] if daily.get("sunrise") else "06:00"
             sunset = (daily.get("sunset", ["18:30"])[0]).split("T")[-1][:5] if daily.get("sunset") else "18:30"
+            
+            rain_prob_daily = daily.get("precipitation_probability_max", [0])
+            rain_prob = int(rain_prob_daily[0]) if rain_prob_daily and rain_prob_daily[0] is not None else 0
+            
+            rain_sum_daily = daily.get("precipitation_sum", [0.0])
+            rainfall_mm = float(rain_sum_daily[0]) if rain_sum_daily and rain_sum_daily[0] is not None else float(curr.get("precipitation", 0.0) or 0.0)
 
             return {
                 "location": location.title(),
@@ -271,7 +304,9 @@ class OpenMeteoWeatherProvider(WeatherProvider):
                 "pressure": round(curr.get("surface_pressure", 1013)),
                 "visibility": 10.0,
                 "condition": condition,
-                "rain_probability": int(curr.get("precipitation", 0) * 10),
+                "weather_code": condition_code,
+                "rain_probability": rain_prob,
+                "rainfall_mm": round(rainfall_mm, 1),
                 "sunrise": sunrise,
                 "sunset": sunset,
                 "data_source": "Open-Meteo (Live Real Data)",
@@ -430,19 +465,21 @@ def get_weather_provider() -> WeatherProvider:
     return OpenMeteoWeatherProvider()
 
 
-async def get_current_weather_safe(location: str) -> dict:
+async def get_current_weather_safe(location: str, lat: float = None, lon: float = None) -> dict:
     """
     Safe getter for current weather. Tries configured provider first,
     then fails over to OpenMeteoWeatherProvider (real data) before mock.
     """
     provider = get_weather_provider()
     try:
+        if isinstance(provider, (OpenMeteoWeatherProvider, RealWeatherProvider)):
+            return await provider.get_current(location, lat=lat, lon=lon)
         return await provider.get_current(location)
     except Exception as e:
         # Fallback to OpenMeteo real provider if OpenWeatherMap failed
         if not isinstance(provider, OpenMeteoWeatherProvider):
             try:
-                real_fallback = await OpenMeteoWeatherProvider().get_current(location)
+                real_fallback = await OpenMeteoWeatherProvider().get_current(location, lat=lat, lon=lon)
                 real_fallback["data_source"] = "Open-Meteo (Real Live Fallback)"
                 return real_fallback
             except Exception:

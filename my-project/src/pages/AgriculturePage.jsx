@@ -4,6 +4,7 @@ import WeatherCard from '../components/WeatherCard';
 import AgriculturePanel from '../components/AgriculturePanel';
 import MapView from '../components/MapView';
 import useWeather from '../hooks/useWeather';
+import { useGlobalWeather } from '../context/WeatherContext';
 
 const SEASON_INFO = {
   Kharif:  { months: 'Jun – Nov', icon: '🌧️', color: '#34d399', desc: 'Monsoon sowing crops' },
@@ -19,13 +20,17 @@ const CROP_CATEGORIES = [
 ];
 
 export default function AgriculturePage() {
+  const { fetchWeatherForLocation, locationName: globalLocationName } = useGlobalWeather();
   const [location, setLocation] = useState('');
-  const [submitted, setSubmitted] = useState('');
+  const [submitted, setSubmitted] = useState(globalLocationName || '');
 
   const { current, loading } = useWeather(submitted);
 
   const handleSearch = val => {
-    if (val.trim()) setSubmitted(val.trim());
+    if (val.trim()) {
+      setSubmitted(val.trim());
+      fetchWeatherForLocation(val.trim());
+    }
   };
 
   // Detect current month for season

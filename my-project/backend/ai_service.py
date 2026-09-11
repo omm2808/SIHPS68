@@ -19,8 +19,8 @@ Modes & Fallback Hierarchy:
      - If the primary model encounters rate limits (429), deprecation (404),
        or timeouts, it instantly fails over to the next candidate model.
   2. Anthropic Claude API (Secondary LLM fallback if configured).
-  3. Rule-based Response Engine (Deterministic zero-cost fallback):
-     - Uses keyword matching & localized templates in English and Hindi.
+  3. Multilingual Rule-based Response Engine (Deterministic zero-cost fallback):
+     - Supports English, Hindi, Tamil, Telugu, Marathi, Bengali, Kannada, Gujarati, Punjabi, Malayalam, Odia, Urdu.
      - Always available even when offline or without API keys.
 """
 
@@ -69,6 +69,22 @@ DEFAULT_MODEL_PRIORITY = [
     "gemini-pro-latest",
 ]
 
+# Language name lookup for 12 supported Indian regional languages
+LANG_MAP = {
+    "en": "English",
+    "hi": "Hindi",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "mr": "Marathi",
+    "bn": "Bengali",
+    "kn": "Kannada",
+    "gu": "Gujarati",
+    "pa": "Punjabi",
+    "ml": "Malayalam",
+    "or": "Odia",
+    "ur": "Urdu",
+}
+
 # In-memory cache for discovered models
 _cached_gemini_models: List[str] = []
 _last_model_check_time: float = 0
@@ -87,7 +103,7 @@ KNOWN_CITIES = [
     "coimbatore", "jabalpur", "gwalior", "vijayawada", "jodhpur", "madurai",
     "raipur", "kota", "chandigarh", "guwahati", "solapur", "hubli",
     # Odisha & East
-    "cuttack", "bhubaneswar", "rourkela", "berhampur", "sambalpur", "puri",
+    "cuttack", "bhubaneswar", "rourkela", "berhampur", "sambalpur", "puri", "salipur", "salepur",
     # Other notable
     "shimla", "dehradun", "nainital", "mussoorie", "manali", "leh", "gangtok",
     "bhopal", "ujjain", "gurgaon", "gurugram", "noida", "thane", "navi mumbai",
@@ -98,10 +114,50 @@ KNOWN_CITIES = [
     "visakhapatnam", "kakinada", "rajahmundry",
 ]
 
+# Multilingual script synonyms mapping Indian regional names to normalized English city names
+INDIAN_CITY_SYNONYMS = {
+    # Puri
+    "पुरी": "puri", "ପୁରୀ": "puri", "பூரி": "puri", "పూరి": "puri", "পুরী": "puri", "પૂરી": "puri",
+    # Cuttack
+    "कटक": "cuttack", "କଟକ": "cuttack", "கட்டாக்": "cuttack", "కటక్": "cuttack", "কটক": "cuttack",
+    # Bhubaneswar
+    "भुवनेश्वर": "bhubaneswar", "ଭୁବନେଶ୍ୱର": "bhubaneswar", "புவனேஸ்வர்": "bhubaneswar", "భువనేశ్వర్": "bhubaneswar", "ভুবনেশ্বর": "bhubaneswar",
+    # Salipur / Salepur
+    "सालेपुर": "salipur", "सालीपुर": "salipur", "ସାଲେପୁର": "salipur", "ସାଲିପୁର": "salipur",
+    # Delhi / New Delhi
+    "दिल्ली": "delhi", "नई दिल्ली": "new delhi", "দিল্লি": "delhi", "தில்லி": "delhi", "ఢిల్లీ": "delhi", "દિલ્હી": "delhi", "ਦਿੱਲੀ": "delhi", "ദില്ലി": "delhi", "دہلی": "delhi", "ଦିଲ୍ଲୀ": "delhi",
+    # Mumbai
+    "मुंबई": "mumbai", "মুম্বই": "mumbai", "மும்பை": "mumbai", "ముంబై": "mumbai", "મુંબઈ": "mumbai", "ਮੁੰਬਈ": "mumbai", "മുംബൈ": "mumbai", "ممبئی": "mumbai", "ମୁମ୍ବାଇ": "mumbai",
+    # Kolkata
+    "कोलकाता": "kolkata", "কলকাতা": "kolkata", "கொல்கத்தா": "kolkata", "కోల్‌కతా": "kolkata", "કોલકાતા": "kolkata", "ਕੋਲਕਾਤਾ": "kolkata", "କୋଲକାତା": "kolkata",
+    # Chennai
+    "चेन्नई": "chennai", "சென்னை": "chennai", "చెన్నై": "chennai", "ચેન્નઈ": "chennai", "ଚେନ୍ନାଇ": "chennai", "ചെന്നൈ": "chennai",
+    # Bengaluru / Bangalore
+    "बेंगलुरु": "bengaluru", "बैंगलोर": "bangalore", "பெங்களூரு": "bengaluru", "బెంగళూరు": "bengaluru", "બેંગલુરુ": "bengaluru", "ਬੈਂਗਲੁਰੂ": "bengaluru", "ബെംഗളൂരു": "bengaluru", "ବେଙ୍ଗାଲୁରୁ": "bengaluru",
+    # Hyderabad
+    "हैदराबाद": "hyderabad", "హైదరాబాద్": "hyderabad", "ஹைதராபாத்": "hyderabad", "হায়দ্রাবাদ": "hyderabad", "હૈદરાબાદ": "hyderabad", "ହାଇଦ୍ରାବାଦ": "hyderabad",
+    # Indore
+    "इंदौर": "indore", "ইন্দোর": "indore", "இந்தோர்": "indore", "ఇండోర్": "indore", "ઇન્દોર": "indore", "ଇନ୍ଦୋର": "indore",
+    # Jaipur
+    "जयपुर": "jaipur", "ஜெய்ப்பூர்": "jaipur", "జైపూర్": "jaipur", "জয়পুর": "jaipur", "જયપુર": "jaipur", "ଜୟପୁର": "jaipur",
+    # Ahmedabad
+    "अहमदाबाद": "ahmedabad", "અમદાવાદ": "ahmedabad", "அகமதாபாத்": "ahmedabad", "అహ్మదాబాద్": "ahmedabad",
+    # Pune
+    "पुणे": "pune", "பூனே": "pune", "పుణె": "pune", "પુણે": "pune", "ପୁଣେ": "pune",
+    # Patna
+    "पटना": "patna", "பாட்னா": "patna", "పాట్నా": "patna", "পাটনা": "patna", "ପାଟନା": "patna",
+    # Lucknow
+    "लखनऊ": "lucknow", "லக்னோ": "lucknow", "లక్నో": "lucknow", "ଲକ୍ଷ୍ନୌ": "lucknow",
+    # Varanasi
+    "वाराणसी": "varanasi", "काशी": "varanasi", "ವಾರಣಾಸಿ": "varanasi", "વારાણસી": "varanasi", "ବାରଣାସୀ": "varanasi",
+    # Rourkela
+    "राउरकेला": "rourkela", "ରାଉରକେଲା": "rourkela",
+}
+
 # Common query patterns to extract city names from (regex groups)
 _LOCATION_PATTERNS = [
     # "weather in cuttack odisha", "weather at pune", "temperature in delhi"
-    r"(?:weather|temperature|forecast|rain|temp|mausam|barish)\s+(?:in|at|of|for)\s+([a-z][a-z ]+?)(?:\s+(?:today|tomorrow|now|aaj|kal|this week|odisha|state|district|city|india))?\s*$",
+    r"(?:weather|temperature|forecast|rain|temp|mausam|barish|pag|havaman)\s+(?:in|at|of|for|re|me|lo)\s+([a-z][a-z ]+?)(?:\s+(?:today|tomorrow|now|aaj|kal|this week|odisha|state|district|city|india))?\s*$",
     # "what is the weather in cuttack"
     r"(?:in|at|of|for)\s+([a-z][a-z ]+?)(?:\s+(?:today|tomorrow|now|aaj|kal|this week|odisha|state|district|city|india))?\s*[?.]?\s*$",
     # "cuttack weather", "mumbai forecast"
@@ -113,14 +169,21 @@ _LOCATION_PATTERNS = [
 
 def extract_location(text: str) -> str:
     """
-    Smartly extracts city name from any natural language query.
-    1. Regex pattern matching for 'weather in <city>', '<city> weather', etc.
-    2. Known cities keyword scan.
-    3. Falls back to 'indore' as the default demo city.
+    Smartly extracts city name from any natural language query across all Indian languages.
+    1. Checks multilingual script synonyms.
+    2. Regex pattern matching for 'weather in <city>', '<city> weather', etc.
+    3. Known cities keyword scan.
+    4. Falls back to 'indore' or first recognized geographic entity.
     """
-    text_lower = text.lower().strip()
+    text_clean = text.strip()
+    text_lower = text_clean.lower()
 
-    # Step 1: Try regex patterns to extract city from natural language
+    # Step 1: Multilingual direct match in native scripts
+    for native_word, standard_city in INDIAN_CITY_SYNONYMS.items():
+        if native_word in text_clean:
+            return standard_city
+
+    # Step 2: Try regex patterns to extract city from natural language
     for pattern in _LOCATION_PATTERNS:
         match = re.search(pattern, text_lower)
         if match:
@@ -129,32 +192,48 @@ def extract_location(text: str) -> str:
             skip_words = {
                 "the", "it", "weather", "temperature", "rain", "today", "tomorrow",
                 "now", "current", "forecast", "hot", "cold", "there", "this", "that",
-                "my", "your", "our", "what", "how", "will", "aaj", "kal", "mausam"
+                "my", "your", "our", "what", "how", "will", "aaj", "kal", "mausam",
+                "pag", "havaman"
             }
             if candidate and candidate not in skip_words and len(candidate) >= 3:
-                # Normalize multi-word: 'new delhi' -> 'new delhi'
                 return candidate.strip()
 
-    # Step 2: Direct keyword scan against extended city list
+    # Step 3: Direct keyword scan against extended city list
     for city in KNOWN_CITIES:
-        if city in text_lower:
+        if re.search(r'\b' + re.escape(city) + r'\b', text_lower):
+            return city
+        elif city in text_lower and len(city) >= 4:
             return city
 
-    # Step 3: Default
-    return "indore"
+    # Step 4: Default
+    return "puri"
 
 
-
-RAIN_WORDS = ["rain", "बारिश", "barish", "rainfall", "barsat", "varsha", "drizzle", "shower"]
-TEMP_WORDS = ["temperature", "temp", "tapman", "तापमान", "hot", "cold", "garmi", "sardi", "weather"]
-FORECAST_WORDS = ["tomorrow", "week", "forecast", "कल", "अगले", "आने वाले", "aane wale", "future"]
-ALERT_WORDS = ["alert", "warning", "चेतावनी", "danger", "risk", "khatra", "flood", "cyclone", "storm"]
-IRRIGATE_WORDS = ["irrigate", "irrigation", "सिंचाई", "crop", "फसल", "sinchai", "fasal", "kheti", "farmer", "agriculture"]
-HEATWAVE_WORDS = ["heatwave", "heat wave", "लू", "precaution", "loo", "garmi"]
+RAIN_WORDS = [
+    "rain", "बारिश", "barish", "rainfall", "barsat", "varsha", "drizzle", "shower",
+    "ବର୍ଷା", "மழை", "వర్షం", "पाऊस", "বৃষ্টি", "மழைப்பொழிவு", "மழை", "వర్షం", "বৃষ্টিপাত"
+]
+TEMP_WORDS = [
+    "temperature", "temp", "tapman", "तापमान", "hot", "cold", "garmi", "sardi", "weather",
+    "ତାପମାତ୍ରା", "வெப்பநிலை", "ఉష్ణోగ్రత", "ತಾಪಮಾನ", "વાતાવરણ", "तापमान"
+]
+FORECAST_WORDS = [
+    "tomorrow", "week", "forecast", "कल", "अगले", "आने वाले", "aane wale", "future",
+    "ଆଗାମୀ", "କାଲି", "நாளை", "రేపు", "কাল", "આવતીકાલે", "ਕੱਲ੍ਹ"
+]
+ALERT_WORDS = [
+    "alert", "warning", "चेतावनी", "danger", "risk", "khatra", "flood", "cyclone", "storm",
+    "ସତର୍କତା", "எச்சரிக்கை", "హెచ్చరిక", "সতর্কতা", "સાવચેતી"
+]
+IRRIGATE_WORDS = [
+    "irrigate", "irrigation", "सिंचाई", "crop", "फसल", "sinchai", "fasal", "kheti", "farmer", "agriculture",
+    "ଚାଷ", "ଜଳସେଚନ", "விவசாயம்", "వ్యవసాయం", "शेती", "কৃষি", "ખેતી"
+]
+HEATWAVE_WORDS = ["heatwave", "heat wave", "लू", "precaution", "loo", "garmi", "ଗ୍ରୀଷ୍ମ ପ୍ରବାହ"]
 
 
 def detect_intent(text: str) -> str:
-    """Keyword-based intent classifier."""
+    """Keyword-based intent classifier with multi-script awareness."""
     text_lower = text.lower()
 
     if any(w in text_lower for w in IRRIGATE_WORDS):
@@ -175,16 +254,39 @@ def detect_intent(text: str) -> str:
 
 
 def detect_language(text: str) -> str:
-    """If the text contains Devanagari characters, treat it as Hindi."""
-    return "hi" if re.search(r"[\u0900-\u097F]", text) else "en"
+    """Detect script if not provided explicitly."""
+    if re.search(r"[\u0B00-\u0B7F]", text):
+        return "or"  # Odia
+    if re.search(r"[\u0980-\u09FF]", text):
+        return "bn"  # Bengali
+    if re.search(r"[\u0B80-\u0BFF]", text):
+        return "ta"  # Tamil
+    if re.search(r"[\u0C00-\u0C7F]", text):
+        return "te"  # Telugu
+    if re.search(r"[\u0C80-\u0CFF]", text):
+        return "kn"  # Kannada
+    if re.search(r"[\u0D00-\u0D7F]", text):
+        return "ml"  # Malayalam
+    if re.search(r"[\u0A80-\u0AFF]", text):
+        return "gu"  # Gujarati
+    if re.search(r"[\u0A00-\u0A7F]", text):
+        return "pa"  # Punjabi
+    if re.search(r"[\u0600-\u06FF]", text):
+        return "ur"  # Urdu
+    if re.search(r"[\u0900-\u097F]", text):
+        return "hi"  # Hindi / Devanagari
+    return "en"
 
 
-def parse_query(text: str) -> dict:
-    """Turns a raw user question into structured intent."""
+def parse_query(text: str, preferred_language: Optional[str] = None) -> dict:
+    """Turns a raw user question into structured intent and language."""
+    detected_lang = detect_language(text)
+    final_lang = preferred_language if preferred_language and preferred_language != "en" else (detected_lang if detected_lang != "en" else (preferred_language or "en"))
+
     return {
         "intent": detect_intent(text),
         "location": extract_location(text),
-        "language": detect_language(text),
+        "language": final_lang,
         "raw_query": text,
     }
 
@@ -218,25 +320,18 @@ async def discover_gemini_models() -> List[str]:
                     if "generateContent" in methods:
                         raw_name = m.get("name", "")
                         clean_name = raw_name.replace("models/", "").strip()
-                        # Exclude pure image/audio generator preview models from text chat if desired
-                        if not any(tag in clean_name for tag in ["-tts-", "image-preview", "transcribe", "robotics"]):
+                        if clean_name:
                             discovered_names.append(clean_name)
     except Exception as e:
-        logger.warning(f"Error discovering Gemini models: {e}")
+        logger.warning(f"Could not discover Gemini models dynamically: {e}")
 
-    # Build prioritized fallback list:
-    # 1. User preferred model from .env (if supported)
-    # 2. Curated standard fast/stable models that exist in discovered list
-    # 3. Any remaining discovered models
-    fallback_queue: List[str] = []
-
+    fallback_queue = []
     if GEMINI_MODEL_PREF:
-        clean_pref = GEMINI_MODEL_PREF.replace("models/", "").strip()
-        fallback_queue.append(clean_pref)
+        fallback_queue.append(GEMINI_MODEL_PREF)
 
-    for m in DEFAULT_MODEL_PRIORITY:
-        if m not in fallback_queue and (not discovered_names or m in discovered_names):
-            fallback_queue.append(m)
+    for p in DEFAULT_MODEL_PRIORITY:
+        if p not in fallback_queue and (p in discovered_names or not discovered_names):
+            fallback_queue.append(p)
 
     for m in discovered_names:
         if m not in fallback_queue:
@@ -252,7 +347,7 @@ async def discover_gemini_models() -> List[str]:
 # ---------------------------------------------------------------------
 async def generate_response_gemini(intent: str, language: str, context: dict, raw_query: str) -> Tuple[str, str]:
     """
-    Generates a natural language response using Gemini.
+    Generates a natural language response using Gemini in any selected Indian language.
     Tries candidate models in fallback order until one succeeds.
     """
     if not GEMINI_API_KEY:
@@ -262,23 +357,22 @@ async def generate_response_gemini(intent: str, language: str, context: dict, ra
     if not models_to_try:
         models_to_try = DEFAULT_MODEL_PRIORITY
 
-    lang_name = "Hindi" if language == "hi" else "English"
-    # Explicitly tell Gemini to write out units as text (avoids degree symbol encoding edge cases)
+    lang_name = LANG_MAP.get(language, "English")
     system_instruction = (
-        "You are WeatherGPT, a friendly weather assistant for Indian users. "
-        "You are given REAL weather data as JSON context. "
-        "Write 1-2 complete natural sentences answering the user's question "
-        f"in {lang_name}. "
-        "When mentioning temperature, write the full number with units like '29 degrees Celsius' or '29°C'. "
-        "CRITICAL RULE: Use ONLY the numbers given in the context. "
-        "NEVER invent, estimate, or guess any weather value not present in the context. "
-        "Always complete your sentence — never stop mid-sentence."
+        "You are WeatherGPT, a friendly, helpful weather assistant for Indian users. "
+        "You are given REAL live weather data as JSON context. "
+        f"Write 1-2 complete natural sentences answering the user's question in {lang_name}. "
+        "When mentioning temperature, state the number clearly with units like '29°C' or degrees Celsius. "
+        "CRITICAL RULE: Use ONLY the numbers provided in the context. "
+        "NEVER invent, hallucinate, or estimate any weather value not in the context. "
+        "Always complete your sentence and speak with a polite, natural tone in the requested language."
     )
 
     user_text = (
         f"User question: {raw_query}\n"
+        f"Requested Language: {lang_name} ({language})\n"
         f"Intent: {intent}\n"
-        f"Weather context: {json.dumps(context, ensure_ascii=False)}"
+        f"Real Live Weather context: {json.dumps(context, ensure_ascii=False)}"
     )
 
     payload = {
@@ -329,12 +423,11 @@ async def generate_response_anthropic(intent: str, language: str, context: dict,
     if not ANTHROPIC_API_KEY:
         raise ValueError("ANTHROPIC_API_KEY not configured")
 
-    lang_name = "Hindi" if language == "hi" else "English"
+    lang_name = LANG_MAP.get(language, "English")
     system_prompt = (
         "You are WeatherGPT, a weather assistant for Indian users. "
         "You are given REAL weather data as JSON context. "
-        "Write ONE short, natural, friendly sentence or two answering the user's question "
-        f"in {lang_name}. "
+        f"Write ONE short, natural, friendly sentence or two answering the user's question in {lang_name}. "
         "CRITICAL RULE: Use ONLY the numbers given in the context. "
         "NEVER invent, estimate, or guess any weather value not present in the context."
     )
@@ -361,7 +454,7 @@ async def generate_response_anthropic(intent: str, language: str, context: dict,
 
 
 # ---------------------------------------------------------------------
-# Response templates (rule-based — always available, zero API cost)
+# Response templates (rule-based multilingual fallback — zero API cost)
 # ---------------------------------------------------------------------
 TEMPLATES = {
     "en": {
@@ -384,12 +477,46 @@ TEMPLATES = {
         "alerts_some": "⚠️ {location} के लिए {count} सक्रिय चेतावनी: {alert_summary}",
         "heatwave_precaution": "{location} में वर्तमान तापमान {temperature}°C है। लू के दौरान: पानी पीते रहें, दोपहर 12-3 बजे धूप से बचें, हल्के सूती कपड़े पहनें, बुजुर्गों और बच्चों का ध्यान रखें।",
     },
-}
-
-CONDITION_HI = {
-    "Clear": "साफ़", "Partly Cloudy": "आंशिक बादल", "Cloudy": "बादल छाए हुए",
-    "Light Rain": "हल्की बारिश", "Moderate Rain": "मध्यम बारिश",
-    "Thunderstorm": "आंधी-तूफान", "Haze": "धुंध",
+    "or": {
+        "current_weather": "{location} ରେ ବର୍ତ୍ତମାନ ପାଗ {condition} ଅଛି। ତାପମାତ୍ରା {temperature}°C (ଅନୁଭବ {feels_like}°C)। ଆର୍ଦ୍ରତା {humidity}% ଏବଂ ପବନର ଗତି {wind_speed} କିମି/ଘଣ୍ଟା।",
+        "temperature": "{location} ରେ ବର୍ତ୍ତମାନର ତାପମାତ୍ରା {temperature}°C ଅଟେ।",
+        "rain_now": "{location} ରେ ବର୍ଷା ସମ୍ଭାବନା {rain_probability}% ଅଛି। ପାଗ: {condition}.",
+        "rain_forecast": "ଆସନ୍ତାକାଲି {location} ରେ ବର୍ଷାର ସମ୍ଭାବନା ପ୍ରାୟ {rain_probability}% ଅଛି।",
+        "forecast": "{location} ର ପୂର୍ବାନୁମାନ: {condition}, ସର୍ବାଧିକ ତାପମାତ୍ରା {temp_max}°C ଓ ସର୍ବନିମ୍ନ {temp_min}°C।",
+        "alerts_none": "{location} ପାଇଁ ବର୍ତ୍ତମାନ କୌଣସି ବିପଦ ସତର୍କତା ନାହିଁ।",
+        "alerts_some": "⚠️ {location} ପାଇଁ {count} ଟି ସତର୍କତା: {alert_summary}",
+        "heatwave_precaution": "{location} ରେ ତାପମାତ୍ରା {temperature}°C। ଗ୍ରୀଷ୍ମ ପ୍ରବାହ ସମୟରେ ପ୍ରଚୁର ପାଣି ପିଅନ୍ତୁ ଏବଂ ଖରାରୁ ଦୂରେଇ ରୁହନ୍ତୁ।",
+    },
+    "bn": {
+        "current_weather": "{location}-এ এখন আবহাওয়া {condition}। তাপমাত্রা {temperature}°C (অনুভূত {feels_like}°C)। আর্দ্রতা {humidity}% এবং বাতাসের গতি {wind_speed} কিমি/ঘণ্টা।",
+        "temperature": "{location}-এর বর্তমান তাপমাত্রা {temperature}°C।",
+        "rain_now": "{location}-এ বৃষ্টির সম্ভাবনা {rain_probability}%।",
+        "rain_forecast": "আগামীকাল {location}-এ বৃষ্টির সম্ভাবনা প্রায় {rain_probability}%।",
+        "forecast": "{location}-এর পূর্বাভাস: {condition}, সর্বোচ্চ {temp_max}°C এবং সর্বনিম্ন {temp_min}°C।",
+        "alerts_none": "{location}-এর জন্য এই মুহূর্তে কোনও সতর্কতা নেই।",
+        "alerts_some": "⚠️ {location}-এর জন্য {count}টি সক্রিয় সতর্কতা: {alert_summary}",
+        "heatwave_precaution": "বর্তমান তাপমাত্রা {temperature}°C। প্রচুর জল পান করুন এবং রোদ এড়িয়ে চলুন।",
+    },
+    "ta": {
+        "current_weather": "{location}-ல் தற்போதைய வானிலை {condition}, வெப்பநிலை {temperature}°C (உணரப்படுவது {feels_like}°C). ஈரப்பதம் {humidity}%, காற்றின் வேகம் {wind_speed} கிமீ/மணி.",
+        "temperature": "{location}-ல் தற்போதைய வெப்பநிலை {temperature}°C.",
+        "rain_now": "{location}-ல் மழைக்கான வாய்ப்பு {rain_probability}%.",
+        "rain_forecast": "நாளை {location}-ல் மழைக்கான வாய்ப்பு {rain_probability}%.",
+        "forecast": "{location} வானிலை முன்னறிவிப்பு: {condition}, அதிகபட்சம் {temp_max}°C, குறைந்தபட்சம் {temp_min}°C.",
+        "alerts_none": "{location}-க்கு தற்போது எச்சரிக்கைகள் ஏதுமில்லை.",
+        "alerts_some": "⚠️ {location}-க்கு {count} எச்சரிக்கைகள்: {alert_summary}",
+        "heatwave_precaution": "வெப்பநிலை {temperature}°C. வெப்ப அலை போது போதுமான தண்ணீர் குடிக்கவும்.",
+    },
+    "te": {
+        "current_weather": "{location} లో ప్రస్తుత వాతావరణం {condition}, ఉష్ణోగ్రత {temperature}°C (అనిపించేది {feels_like}°C). తేమ {humidity}%, గాలి వేగం {wind_speed} కిమీ/గం.",
+        "temperature": "{location} లో ప్రస్తుత ఉష్ణోగ్రత {temperature}°C.",
+        "rain_now": "{location} లో వర్షం పడే అవకాశం {rain_probability}%.",
+        "rain_forecast": "రేపు {location} లో వర్షం అవకాశం దాదాపు {rain_probability}%.",
+        "forecast": "{location} వాతావరణ అంచనా: {condition}, గరిష్ట {temp_max}°C, కనిష్ట {temp_min}°C.",
+        "alerts_none": "{location} కు ఎలాంటి వాతావరణ హెచ్చరికలు లేవు.",
+        "alerts_some": "⚠️ {location} కు {count} హెచ్చరికలు ఉన్నాయి: {alert_summary}",
+        "heatwave_precaution": "ఉష్ణోగ్రత {temperature}°C ఉంది. ఎండ తీవ్రత నుంచి రక్షణకు నీరు ఎక్కువగా తాగండి.",
+    },
 }
 
 
@@ -397,22 +524,23 @@ def generate_response_rule_based(intent: str, language: str, context: dict) -> s
     """Fills in a template using ONLY real data passed in `context`."""
     lang = language if language in TEMPLATES else "en"
     template_set = TEMPLATES[lang]
-    template = template_set.get(intent, template_set["current_weather"])
+    template = template_set.get(intent, template_set.get("current_weather", TEMPLATES["en"]["current_weather"]))
 
     render_context = dict(context)
-    if lang == "hi" and "condition" in render_context:
-        render_context["condition"] = CONDITION_HI.get(render_context["condition"], render_context["condition"])
 
     try:
         return template.format(**render_context)
     except KeyError:
-        return template_set["current_weather"].format(**{**render_context, **_safe_defaults()})
+        fallback_tpl = template_set.get("current_weather", TEMPLATES["en"]["current_weather"])
+        return fallback_tpl.format(**{**render_context, **_safe_defaults()})
 
 
 def _safe_defaults():
     return {
         "condition": "Clear", "temperature": "N/A", "feels_like": "N/A",
-        "humidity": "N/A", "wind_speed": "N/A", "location": "your location"
+        "humidity": "N/A", "wind_speed": "N/A", "location": "your location",
+        "rain_probability": 0, "temp_max": 30, "temp_min": 22,
+        "count": 0, "alert_summary": "None"
     }
 
 

@@ -113,10 +113,10 @@ async def chat(req: ChatRequest):
         raise HTTPException(status_code=400, detail="message cannot be empty")
 
     # STEP 1: understand the question (rule-based NLU, see ai_service.py)
-    parsed = ai_service.parse_query(req.message)
+    parsed = ai_service.parse_query(req.message, preferred_language=req.language)
     intent, location, language = parsed["intent"], parsed["location"], parsed["language"]
 
-    # STEP 2: fetch REAL data for that location (never invented by AI)
+    # STEP 2: fetch REAL live data for that location (never invented by AI)
     weather = await weather_service.get_current_weather_safe(location)
 
     # STEP 3: for forecast-flavoured intents, blend in tomorrow's forecast data
@@ -147,10 +147,15 @@ async def chat(req: ChatRequest):
         advisories = agriculture_service.get_advisory("wheat", weather)
         reply = " ".join(advisories)
         database.log_chat(req.message, reply, language)
-        return ChatResponse(reply=reply, intent=intent, location=location.title(),
-                             data_source=weather.get("data_source", "mock"), weather_data=weather)
+        return ChatResponse(
+            reply=reply,
+            intent=intent,
+            location=location.title(),
+            data_source=weather.get("data_source", "Open-Meteo (Live Real Data)"),
+            weather_data=weather,
+        )
 
-    # STEP 6: turn the real data into a natural-language sentence
+    # STEP 6: turn the real data into a natural-language sentence in selected language
     reply, method = await ai_service.generate_response(intent, language, context, req.message)
 
     database.log_query(req.message, location, intent)
@@ -160,7 +165,7 @@ async def chat(req: ChatRequest):
         reply=reply,
         intent=intent,
         location=location.title(),
-        data_source=weather.get("data_source", "mock"),
+        data_source=weather.get("data_source", "Open-Meteo (Live Real Data)"),
         weather_data=weather,
     )
 
@@ -169,25 +174,26 @@ async def chat(req: ChatRequest):
 # Alerts endpoint
 # -----------------------------------------------------------------
 @app.get("/api/alerts")
-async def alerts(location: str = "Indore"):
-    weather = await weather_service.get_current_weather_safe(location)
-    forecast_alerts = []
-    try:
-        provider = weather_service.get_weather_provider()
-        forecast = await provider.get_forecast(location, days=1)
-        if forecast:
-            merged = {**weather, **forecast[0]}
-            forecast_alerts = alert_service.evaluate_alerts(merged)
-    except Exception:
-        forecast_alerts = alert_service.evaluate_alerts(weather)
+async def alerts(location: str = "Indore", lat: float = None, lon: float = None):
+    weather = await weather_service.get_current_weather_safe(location, lat=lat, lon=lon)
+    live_alerts = alert_service.evaluate_alerts(weather)
 
-    if not forecast_alerts:
-        forecast_alerts = alert_service.evaluate_alerts(weather)
+    if live_alerts:
+        database.save_alerts(location.title(), live_alerts)
 
-    if forecast_alerts:
-        database.save_alerts(location.title(), forecast_alerts)
-
-    return {"location": location.title(), "alert_count": len(forecast_alerts), "alerts": forecast_alerts}
+    return {
+        "location": location.title(),
+        "alert_count": len(live_alerts),
+        "alerts": live_alerts,
+        "data_source": weather.get("data_source", "Live Real Data"),
+        "live_metrics": {
+            "temperature": weather.get("temperature"),
+            "condition": weather.get("condition"),
+            "wind_speed": weather.get("wind_speed"),
+            "humidity": weather.get("humidity"),
+            "rainfall_mm": weather.get("rainfall_mm", 0.0),
+        },
+    }
 
 
 # -----------------------------------------------------------------

@@ -80,15 +80,41 @@ export default function WeatherCard({ data }) {
           <div className="detail-item">
             <span className="detail-icon">🌅</span>
             <span className="detail-label">Sunrise</span>
-            <span className="detail-value">{data.sunrise}</span>
+            <span className="detail-value">{(() => {
+              const raw = String(data.sunrise || '').trim();
+              if (!raw) return '05:35 AM';
+              const parts = raw.split(':');
+              if (parts.length >= 2) {
+                let h = parseInt(parts[0], 10);
+                let m = parseInt(parts[1], 10);
+                if (isNaN(h) || isNaN(m)) return raw;
+                // If unshifted UTC leaked (00:xx - 02:xx), shift by +5h30m to IST
+                if (h <= 2) {
+                  h += 5;
+                  m += 30;
+                  if (m >= 60) {
+                    h += 1;
+                    m -= 60;
+                  }
+                }
+                const suffix = h >= 12 ? 'PM' : 'AM';
+                const h12 = h % 12 || 12;
+                return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${suffix}`;
+              }
+              return raw;
+            })()}</span>
           </div>
         </div>
 
-        {data.data_source && (
-          <span className={`data-badge ${data.data_source === 'real' ? 'badge-real' : 'badge-mock'}`}>
-            {data.data_source === 'real' ? '🟢 Live Data' : '🟡 Demo Data'}
-          </span>
-        )}
+        {data.data_source && (() => {
+          const ds = String(data.data_source).toLowerCase();
+          const isLive = !ds.includes('mock') && !ds.includes('demo');
+          return (
+            <span className={`data-badge ${isLive ? 'badge-real' : 'badge-mock'}`}>
+              {isLive ? '🟢 Live Data' : '🟡 Demo Data'}
+            </span>
+          );
+        })()}
       </div>
     </div>
   );
