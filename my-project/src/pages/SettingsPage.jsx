@@ -1,10 +1,22 @@
 import { useState } from 'react';
+import { useSettings } from '../context/SettingsContext';
 
-export default function SettingsPage() {
-  const [unit, setUnit] = useState('celsius');
-  const [speedUnit, setSpeedUnit] = useState('kmh');
-  const [notifications, setNotifications] = useState(true);
-  const [voiceSpeed, setVoiceSpeed] = useState('normal');
+export default function SettingsPage({ onNavigateDashboard }) {
+  const {
+    unit,
+    speedUnit,
+    notifications,
+    voiceSpeed,
+    updateSetting,
+  } = useSettings();
+
+  const [savedBanner, setSavedBanner] = useState('');
+
+  const handleUpdate = (key, val, label) => {
+    updateSetting(key, val);
+    setSavedBanner(`Saved: ${label}. Dashboard updated!`);
+    setTimeout(() => setSavedBanner(''), 3000);
+  };
 
   return (
     <div className="page settings-page">
@@ -13,24 +25,35 @@ export default function SettingsPage() {
           <h1 className="page-title">
             <span className="page-title-icon">⚙</span> Dashboard Settings
           </h1>
-          <p className="page-subtitle">Customize units, notifications, and weather preferences</p>
+          <p className="page-subtitle">Customize units, notifications, and weather preferences (synced live to Dashboard)</p>
         </div>
       </div>
+
+      {savedBanner && (
+        <div className="settings-live-feedback">
+          <span className="feedback-check">✓</span>
+          <span>{savedBanner}</span>
+        </div>
+      )}
 
       <div className="settings-grid">
         {/* Unit Settings */}
         <div className="settings-card">
-          <h3 className="settings-card-title">🌡️ Temperature Unit</h3>
+          <div className="settings-card-header">
+            <h3 className="settings-card-title">🌡️ Temperature Unit</h3>
+            <span className="setting-active-badge">Active: {unit === 'fahrenheit' ? '°F' : '°C'}</span>
+          </div>
+          <p className="setting-desc">Sets temperature display on Dashboard, Forecast, Popular Cities, and Charts</p>
           <div className="settings-options-row">
             <button
               className={`setting-choice-btn ${unit === 'celsius' ? 'active' : ''}`}
-              onClick={() => setUnit('celsius')}
+              onClick={() => handleUpdate('unit', 'celsius', 'Celsius (°C)')}
             >
               Celsius (°C)
             </button>
             <button
               className={`setting-choice-btn ${unit === 'fahrenheit' ? 'active' : ''}`}
-              onClick={() => setUnit('fahrenheit')}
+              onClick={() => handleUpdate('unit', 'fahrenheit', 'Fahrenheit (°F)')}
             >
               Fahrenheit (°F)
             </button>
@@ -39,23 +62,27 @@ export default function SettingsPage() {
 
         {/* Wind Speed Unit */}
         <div className="settings-card">
-          <h3 className="settings-card-title">💨 Wind Speed Unit</h3>
+          <div className="settings-card-header">
+            <h3 className="settings-card-title">💨 Wind Speed Unit</h3>
+            <span className="setting-active-badge">Active: {speedUnit}</span>
+          </div>
+          <p className="setting-desc">Sets wind speed metrics across current weather stats and telemetry</p>
           <div className="settings-options-row">
             <button
               className={`setting-choice-btn ${speedUnit === 'kmh' ? 'active' : ''}`}
-              onClick={() => setSpeedUnit('kmh')}
+              onClick={() => handleUpdate('speedUnit', 'kmh', 'km/h')}
             >
               km/h
             </button>
             <button
               className={`setting-choice-btn ${speedUnit === 'mph' ? 'active' : ''}`}
-              onClick={() => setSpeedUnit('mph')}
+              onClick={() => handleUpdate('speedUnit', 'mph', 'mph')}
             >
               mph
             </button>
             <button
               className={`setting-choice-btn ${speedUnit === 'ms' ? 'active' : ''}`}
-              onClick={() => setSpeedUnit('ms')}
+              onClick={() => handleUpdate('speedUnit', 'ms', 'm/s')}
             >
               m/s
             </button>
@@ -64,12 +91,17 @@ export default function SettingsPage() {
 
         {/* Notifications */}
         <div className="settings-card">
-          <h3 className="settings-card-title">🔔 Severe Weather Notifications</h3>
+          <div className="settings-card-header">
+            <h3 className="settings-card-title">🔔 Severe Weather Notifications</h3>
+            <span className={`setting-active-badge ${notifications ? 'badge-on' : 'badge-off'}`}>
+              {notifications ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
           <div className="settings-toggle-row">
-            <span>Receive automatic warnings for thunderstorms and heavy rain</span>
+            <span>Receive automatic warnings & live badges for thunderstorms and heavy rain</span>
             <button
               className={`toggle-switch ${notifications ? 'on' : 'off'}`}
-              onClick={() => setNotifications(!notifications)}
+              onClick={() => handleUpdate('notifications', !notifications, notifications ? 'Alerts Disabled' : 'Alerts Enabled')}
             >
               {notifications ? 'Enabled' : 'Disabled'}
             </button>
@@ -78,23 +110,27 @@ export default function SettingsPage() {
 
         {/* AI Voice Assistant */}
         <div className="settings-card">
-          <h3 className="settings-card-title">🗣️ WeatherGPT Voice Speed</h3>
+          <div className="settings-card-header">
+            <h3 className="settings-card-title">🗣️ WeatherGPT Voice Speed</h3>
+            <span className="setting-active-badge">Active: {voiceSpeed}</span>
+          </div>
+          <p className="setting-desc">Controls speech rate when WeatherGPT speaks responses</p>
           <div className="settings-options-row">
             <button
               className={`setting-choice-btn ${voiceSpeed === 'slow' ? 'active' : ''}`}
-              onClick={() => setVoiceSpeed('slow')}
+              onClick={() => handleUpdate('voiceSpeed', 'slow', 'Voice Speed: Slow')}
             >
               Slow
             </button>
             <button
               className={`setting-choice-btn ${voiceSpeed === 'normal' ? 'active' : ''}`}
-              onClick={() => setVoiceSpeed('normal')}
+              onClick={() => handleUpdate('voiceSpeed', 'normal', 'Voice Speed: Normal')}
             >
               Normal
             </button>
             <button
               className={`setting-choice-btn ${voiceSpeed === 'fast' ? 'active' : ''}`}
-              onClick={() => setVoiceSpeed('fast')}
+              onClick={() => handleUpdate('voiceSpeed', 'fast', 'Voice Speed: Fast')}
             >
               Fast
             </button>
@@ -113,7 +149,7 @@ export default function SettingsPage() {
             <span className="about-badge">⚡ React 19</span>
             <span className="about-badge">🌐 Open-Meteo Free API</span>
             <span className="about-badge">🗺️ Leaflet Maps</span>
-            <span className="about-badge">🗣️ Web Speech API</span>
+            <span className="about-badge">⚙️ Live State Sync</span>
           </div>
         </div>
       </div>

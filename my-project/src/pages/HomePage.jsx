@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import MapView from '../components/MapView';
 import SummaryChart from '../components/SummaryChart';
+import RiskAlertToast from '../components/RiskAlertToast';
+import { getAlerts } from '../api/weatherApi';
+import { useSettings } from '../context/SettingsContext';
 
 // WMO Code mapping
 const WMO_CODES = {
@@ -39,7 +42,8 @@ const POPULAR_CITIES = [
   { name: 'Kolkata', lat: 22.5726, lon: 88.3639, defaultCondition: 'Mostly Sunny', icon: '🌤️' },
 ];
 
-export default function HomePage() {
+export default function HomePage({ onNavigateSearch, onNavigateSettings }) {
+  const { unit, speedUnit, notifications, convertTemp, convertWind, tempUnitSymbol } = useSettings();
   const [currentTime, setCurrentTime] = useState('');
   const [coords, setCoords] = useState({ lat: 17.385, lon: 78.4867 });
   const [locationName, setLocationName] = useState('Locating…');
@@ -55,8 +59,12 @@ export default function HomePage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const searchTimerRef = useRef(null);
 
-  // Alerts
+  // Alerts & Notifications
+  const [alertsList, setAlertsList] = useState([]);
   const [showAlerts, setShowAlerts] = useState(false);
+  const [toastAlert, setToastAlert] = useState(null);
+  const [showToast, setShowToast] = useState(false);
+  const lastAlertKeyRef = useRef('');
 
   // Clock
   useEffect(() => {
@@ -70,6 +78,87 @@ export default function HomePage() {
     return () => clearInterval(id);
   }, []);
 
+  // ─── Fetch Alerts for current location ─────────────────
+  const fetchAlertsForLocation = useCallback(async (targetName, currentWeatherData) => {
+    if (!targetName || targetName === 'Locating…') return;
+    try {
+      const res = await getAlerts(targetName);
+      let list = [];
+      if (res && res.alerts && res.alerts.length > 0) {
+        list = res.alerts.map((a) => ({
+          ...a,
+          location: res.location || targetName,
+        }));
+      }
+
+      // Fallback: evaluate meteorological rules from live weather if backend alerts are 0
+      if (list.length === 0 && currentWeatherData?.current) {
+        const c = currentWeatherData.current;
+        const code = c.weather_code;
+        const temp = c.temperature_2m;
+        const wind = c.wind_speed_10m;
+
+        if ([95, 96, 99].includes(code)) {
+          list.push({
+            type: 'Thunderstorm & Lightning',
+            severity: 'HIGH',
+            message: `Thunderstorm activity reported in ${targetName}.`,
+            recommendation: 'Stay indoors. Avoid open fields, tall trees, and metal structures. Unplug electronics.',
+            location: targetName,
+          });
+        }
+        if ([65, 82].includes(code)) {
+          list.push({
+            type: 'Heavy Rainfall / Flood Risk',
+            severity: 'SEVERE',
+            message: `Very heavy rainfall expected in ${targetName}.`,
+            recommendation: 'Avoid waterlogged areas and unnecessary travel. Move to higher ground if near flood-prone zones.',
+            location: targetName,
+          });
+        }
+        if (wind >= 45) {
+          list.push({
+            type: 'Strong Wind Alert',
+            severity: wind >= 60 ? 'SEVERE' : 'MODERATE',
+            message: `Sustained wind gusts of ${Math.round(wind)} km/h recorded in ${targetName}.`,
+            recommendation: 'Secure loose outdoor items. Drive carefully, especially two-wheelers.',
+            location: targetName,
+          });
+        }
+        if (temp >= 40) {
+          list.push({
+            type: 'Heatwave Advisory',
+            severity: temp >= 45 ? 'EXTREME' : 'HIGH',
+            message: `Temperature in ${targetName} is ${Math.round(temp)}°C — heatwave conditions.`,
+            recommendation: 'Limit outdoor exposure during peak afternoon hours. Drink water frequently.',
+            location: targetName,
+          });
+        }
+      }
+
+      setAlertsList(list);
+
+      // Trigger right-top popup toast if notifications enabled and hazards exist
+      if (notifications && list.length > 0) {
+        const key = `${targetName}-${list[0].type}-${list.length}`;
+        if (lastAlertKeyRef.current !== key) {
+          lastAlertKeyRef.current = key;
+          setToastAlert(list[0]);
+          setShowToast(true);
+        }
+      }
+    } catch (err) {
+      console.warn('Alerts fetch error:', err);
+    }
+  }, [notifications]);
+
+  // Hide toast immediately if notifications turned OFF
+  useEffect(() => {
+    if (!notifications) {
+      setShowToast(false);
+    }
+  }, [notifications]);
+
   // ─── Fetch weather from Open-Meteo ────────────────────
   const fetchWeather = useCallback(async (lat, lon, name) => {
     try {
@@ -79,10 +168,13 @@ export default function HomePage() {
       setWeatherData(data);
       setCoords({ lat, lon });
       if (name) setLocationName(name);
+
+      const targetCity = name || 'Your Location';
+      fetchAlertsForLocation(targetCity, data);
     } catch (err) {
       console.error('Weather fetch error:', err);
     }
-  }, []);
+  }, [fetchAlertsForLocation]);
 
   // ─── Reverse geocode ──────────────────────────────────
   const reverseGeocode = async (lat, lon) => {
@@ -219,9 +311,10 @@ export default function HomePage() {
   // ─── Derived weather values ───────────────────────────
   const cur = weatherData?.current;
   const wmoInfo = cur ? getWmoInfo(cur.weather_code) : ['—', '🌡️'];
-  const temp = cur ? Math.round(cur.temperature_2m) : '—';
+  const rawTemp = cur ? cur.temperature_2m : null;
+  const temp = rawTemp !== null ? convertTemp(rawTemp) : '—';
   const humidity = cur ? cur.relative_humidity_2m : '—';
-  const wind = cur ? Math.round(cur.wind_speed_10m) : '—';
+  const windObj = cur ? convertWind(cur.wind_speed_10m) : { val: '—', unit: speedUnit === 'mph' ? 'mph' : speedUnit === 'ms' ? 'm/s' : 'km/h' };
   const pressure = cur ? Math.round(cur.surface_pressure) : '—';
   const uv = cur ? Math.round(cur.uv_index ?? 0) : '—';
   const daily = weatherData?.daily;
@@ -255,36 +348,145 @@ export default function HomePage() {
 
         <div className="topbar-actions">
           <button
-            className="topbar-icon-btn bell-btn"
-            title="Weather Alerts"
+            className={`topbar-icon-btn bell-btn ${!notifications ? 'bell-muted' : ''} ${notifications && alertsList.length > 0 ? 'has-active-alerts' : ''}`}
+            title={
+              notifications
+                ? `Weather Alerts (${alertsList.length} active in ${locationName})`
+                : 'Weather Alerts (Notifications Silenced in Settings)'
+            }
             onClick={() => setShowAlerts(!showAlerts)}
           >
-            <span>🔔</span>
-            <span className="bell-badge" />
+            <span>{notifications ? '🔔' : '🔕'}</span>
+            {notifications && alertsList.length > 0 && (
+              <span className="bell-badge">{alertsList.length}</span>
+            )}
           </button>
-          <div className="user-avatar-pill" title="Profile">
-            <div className="avatar-img-frame">
-              <span>👩‍🦰</span>
-            </div>
-          </div>
+          {onNavigateSettings && (
+            <button
+              className="topbar-settings-pill"
+              title="Click to change units & dashboard settings"
+              onClick={onNavigateSettings}
+            >
+              <span className="settings-pill-icon">⚙️</span>
+              <span className="settings-pill-text">{tempUnitSymbol} · {speedUnit}</span>
+            </button>
+          )}
         </div>
 
         {showAlerts && (
-          <div className="alerts-modal-dropdown">
+          <div className="alerts-modal-dropdown" role="dialog" aria-label="Active Weather Alerts Panel">
             <div className="alerts-modal-header">
-              <span>⚡ Weather Alerts</span>
-              <button className="close-btn" onClick={() => setShowAlerts(false)}>✕</button>
+              <div className="panel-title-group">
+                <span className="panel-title-icon">⚡</span>
+                <span className="panel-title-text">Notification Panel</span>
+                {alertsList.length > 0 && (
+                  <span className="panel-count-tag">{alertsList.length} Active</span>
+                )}
+              </div>
+              <button
+                className="close-btn"
+                onClick={() => setShowAlerts(false)}
+                title="Close notification panel"
+              >
+                ✕
+              </button>
             </div>
+
             <div className="alerts-modal-body">
-              <div className="alert-item warn">
-                <strong>🌧️ Monsoon Heavy Rain Watch</strong>
-                <p>Heavy rainfall expected in next 24-48 hours.</p>
-              </div>
-              <div className="alert-item info">
-                <strong>💨 Wind Advisory</strong>
-                <p>Gusty winds up to 25 km/h expected.</p>
-              </div>
+              {!notifications && (
+                <div className="alert-panel-item item-silenced">
+                  <div className="silenced-top">
+                    <span>🔕</span>
+                    <strong>Alert Popups Silenced</strong>
+                  </div>
+                  <p>Right-top corner hazard popups are currently turned OFF in Settings. Alerts remain stored here for your safety.</p>
+                  {onNavigateSettings && (
+                    <button
+                      className="silenced-settings-btn"
+                      onClick={() => {
+                        setShowAlerts(false);
+                        onNavigateSettings();
+                      }}
+                    >
+                      Turn ON in Settings →
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {alertsList.length === 0 ? (
+                <div className="alert-panel-all-clear">
+                  <span className="clear-icon">🛡️</span>
+                  <div className="clear-text">
+                    <strong>All Clear — No Active Hazards</strong>
+                    <p>Current atmospheric conditions in {locationName} indicate normal parameters.</p>
+                  </div>
+                </div>
+              ) : (
+                alertsList.map((alert, idx) => {
+                  const sev = (alert.severity || 'HIGH').toUpperCase();
+                  const sevClass =
+                    sev === 'SEVERE' || sev === 'EXTREME'
+                      ? 'sev-severe'
+                      : sev === 'HIGH'
+                      ? 'sev-high'
+                      : sev === 'MODERATE'
+                      ? 'sev-mod'
+                      : 'sev-low';
+
+                  const icon = alert.type?.toLowerCase().includes('rain')
+                    ? '🌧️'
+                    : alert.type?.toLowerCase().includes('thunder')
+                    ? '⛈️'
+                    : alert.type?.toLowerCase().includes('wind')
+                    ? '💨'
+                    : alert.type?.toLowerCase().includes('heat')
+                    ? '☀️'
+                    : alert.type?.toLowerCase().includes('snow')
+                    ? '❄️'
+                    : '⚠️';
+
+                  return (
+                    <div key={idx} className={`alert-panel-card ${sevClass}`}>
+                      <div className="panel-card-head">
+                        <div className="panel-card-title-wrap">
+                          <span className="panel-card-icon">{icon}</span>
+                          <span className="panel-card-title">{alert.type}</span>
+                        </div>
+                        <span className={`panel-sev-pill ${sevClass}`}>{alert.severity}</span>
+                      </div>
+
+                      <div className="panel-card-location">📍 {alert.location || locationName}</div>
+
+                      <p className="panel-card-msg">{alert.message}</p>
+
+                      {alert.recommendation && (
+                        <div className="panel-card-safety">
+                          <span className="safety-ico">🛡️</span>
+                          <span className="safety-txt">{alert.recommendation}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
+
+            {/* Action Footer */}
+            {onNavigateSettings && (
+              <div className="alerts-modal-footer">
+                <button
+                  className="panel-cfg-btn"
+                  onClick={() => {
+                    setShowAlerts(false);
+                    onNavigateSettings();
+                  }}
+                  title="Configure alert notification settings"
+                >
+                  ⚙️ Notification Settings
+                </button>
+              </div>
+            )}
           </div>
         )}
       </header>
@@ -313,7 +515,7 @@ export default function HomePage() {
             <div className="weather-temp-wrap">
               <div className="temp-number-row">
                 <span className="temp-big">{temp}</span>
-                <span className="temp-unit">°C</span>
+                <span className="temp-unit">{tempUnitSymbol}</span>
               </div>
               <div className="weather-condition-text">{wmoInfo[0]}</div>
               <div className="weather-location-sub">
@@ -337,7 +539,7 @@ export default function HomePage() {
             <div className="stat-metric-divider" />
             <div className="stat-metric-col">
               <span className="metric-icon">💨</span>
-              <span className="metric-val">{wind}km/h</span>
+              <span className="metric-val">{windObj.val}{windObj.unit}</span>
               <span className="metric-label">Wind</span>
             </div>
             <div className="stat-metric-divider" />
@@ -370,17 +572,20 @@ export default function HomePage() {
               const live = cityTemps[city.name];
               const cond = live?.desc || city.defaultCondition;
               const icon = live?.icon || city.icon;
-              const tempC = live?.temp ?? '—';
+              const rawC = live?.temp;
+              const displayTemp = rawC !== undefined && rawC !== null ? `${convertTemp(rawC)}°` : '—°';
 
               return (
                 <div key={city.name} className="pop-city-row">
-                  <div className="city-left">
+                  <div className="pop-city-left">
                     <span className="city-weather-icon">{icon}</span>
-                    <span className="city-name-text">{city.name}</span>
+                    <div className="city-info-col">
+                      <span className="city-name-text" title={city.name}>{city.name}</span>
+                      <span className="city-condition-text" title={cond}>{cond}</span>
+                    </div>
                   </div>
-                  <div className="city-right">
-                    <span className="city-condition-text">{cond}</span>
-                    <span className="city-temp-badge">{tempC}°</span>
+                  <div className="pop-city-right">
+                    <span className="city-temp-badge">{displayTemp}</span>
                   </div>
                 </div>
               );
@@ -403,8 +608,8 @@ export default function HomePage() {
               ? daily.time.slice(0, forecastDays).map((t, idx) => {
                   const d = new Date(t + 'T12:00:00');
                   const label = idx === 0 ? 'Today' : d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', weekday: 'short' });
-                  const hi = Math.round(daily.temperature_2m_max[idx]);
-                  const lo = Math.round(daily.temperature_2m_min[idx]);
+                  const hi = convertTemp(daily.temperature_2m_max[idx]);
+                  const lo = convertTemp(daily.temperature_2m_min[idx]);
                   const w = getWmoInfo(daily.weather_code[idx]);
                   return (
                     <div key={t} className={`forecast-row-item ${idx === selectedDayIdx ? 'active-highlight' : ''}`} onClick={() => setSelectedDayIdx(idx)}>
@@ -434,6 +639,22 @@ export default function HomePage() {
           />
         </div>
       </div>
+
+      {/* ═══ TOP-RIGHT FLOATING RISK POPUP (TOAST) ═══ */}
+      {showToast && toastAlert && notifications && (
+        <div className="risk-toast-wrapper">
+          <RiskAlertToast
+            alert={toastAlert}
+            totalAlerts={alertsList.length}
+            duration={6500}
+            onClose={() => setShowToast(false)}
+            onOpenPanel={() => {
+              setShowToast(false);
+              setShowAlerts(true);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

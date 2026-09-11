@@ -164,8 +164,8 @@ export default function WeatherGPTPage() {
                       <span className="meta-badge intent">{m.intent}</span>
                       {m.location && <span className="meta-badge location">📍 {m.location}</span>}
                       {m.source && (
-                        <span className={`meta-badge source ${m.source === 'real' ? 'live' : 'demo'}`}>
-                          {m.source === 'real' ? '🟢 Live Data' : '🟡 Demo Mode'}
+                        <span className={`meta-badge source ${/live|real|openweather|open-meteo/i.test(m.source) ? 'live' : 'demo'}`}>
+                          {/live|real|openweather|open-meteo/i.test(m.source) ? '🟢 Live Data' : '🟡 Demo Mode'}
                         </span>
                       )}
                     </div>

@@ -4,9 +4,12 @@ const CONDITION_ICONS = {
   'Haze': '🌫️', 'Rain': '🌧️', 'Clouds': '☁️',
 };
 
+import { useSettings } from '../context/SettingsContext';
+
 export default function HourlyTimeline({ hourly }) {
   if (!hourly || hourly.length === 0) return null;
 
+  const { convertTemp } = useSettings();
   const maxT = Math.max(...hourly.map(h => h.temperature));
   const minT = Math.min(...hourly.map(h => h.temperature));
   const range = maxT - minT || 1;
@@ -27,7 +30,7 @@ export default function HourlyTimeline({ hourly }) {
               <div className="hourly-bar-track">
                 <div className="hourly-bar" style={{ height: `${Math.max(pct, 10)}%` }} />
               </div>
-              <span className="hourly-temp">{h.temperature}°</span>
+              <span className="hourly-temp">{convertTemp(h.temperature)}°</span>
               <span className="hourly-rain">💧{h.rain_probability}%</span>
             </div>
           );

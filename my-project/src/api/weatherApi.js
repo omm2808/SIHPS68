@@ -20,7 +20,7 @@ async function request(path, options = {}) {
     return await res.json();
   } catch (err) {
     if (err.message === 'Failed to fetch') {
-      throw new Error('Cannot reach the server. Is the backend running on port 8000?');
+      throw new Error('Cannot reach the server. Is the backend running?');
     }
     throw err;
   }

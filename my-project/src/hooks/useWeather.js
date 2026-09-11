@@ -6,7 +6,7 @@ import { getCurrentWeather, getForecast, getHourly, getAlerts } from '../api/wea
  * Fetches current weather, forecast, hourly, and alerts in parallel.
  * Returns { current, forecast, hourly, alerts, loading, error, refresh }
  */
-export default function useWeather(location = 'Indore') {
+export default function useWeather(location = 'Indore', days = 10) {
   const [current, setCurrent] = useState(null);
   const [forecast, setForecast] = useState([]);
   const [hourly, setHourly] = useState([]);
@@ -15,12 +15,13 @@ export default function useWeather(location = 'Indore') {
   const [error, setError] = useState(null);
 
   const fetchAll = useCallback(async () => {
+    if (!location || !location.trim()) return;
     setLoading(true);
     setError(null);
     try {
       const [curr, fcast, hr, al] = await Promise.all([
         getCurrentWeather(location),
-        getForecast(location, 7),
+        getForecast(location, days || 10),
         getHourly(location, 12),
         getAlerts(location),
       ]);
@@ -33,7 +34,7 @@ export default function useWeather(location = 'Indore') {
     } finally {
       setLoading(false);
     }
-  }, [location]);
+  }, [location, days]);
 
   useEffect(() => {
     fetchAll();

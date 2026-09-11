@@ -13,13 +13,22 @@ Interactive API docs auto-appear at: http://localhost:8000/docs
 """
 
 import os
+from pathlib import Path
 from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-load_dotenv()  # reads variables from .env into os.environ
+# Search for .env in backend dir or project root (handles running from any CWD)
+for _env_candidate in [
+    Path(__file__).resolve().parent / ".env",
+    Path(__file__).resolve().parent.parent / ".env",
+    Path(".env").resolve(),
+]:
+    if _env_candidate.exists():
+        load_dotenv(dotenv_path=_env_candidate, override=True)
+        break
 
 import database
 import weather_service
@@ -58,8 +67,10 @@ def health():
         "demo_mode": DEMO_MODE,
         "weather_provider": type(weather_service.get_weather_provider()).__name__,
         "llm_enabled": ai_service.USE_LLM,
+        "llm_status": ai_service.get_llm_status(),
         "timestamp": datetime.utcnow().isoformat(),
     }
+
 
 
 # -----------------------------------------------------------------

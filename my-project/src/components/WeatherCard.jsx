@@ -22,11 +22,18 @@ const CONDITION_CLASSES = {
   'Haze': 'weather-haze',
 };
 
+import { useSettings } from '../context/SettingsContext';
+
 export default function WeatherCard({ data }) {
   if (!data) return null;
 
+  const { convertTemp, convertWind, tempUnitSymbol } = useSettings();
   const condClass = CONDITION_CLASSES[data.condition] || 'weather-clear';
   const icon = CONDITION_ICONS[data.condition] || '🌡️';
+
+  const displayTemp = convertTemp(data.temperature);
+  const displayFeels = convertTemp(data.feels_like);
+  const windObj = convertWind(data.wind_speed);
 
   return (
     <div className={`weather-card ${condClass}`}>
@@ -35,12 +42,12 @@ export default function WeatherCard({ data }) {
         <div className="weather-main">
           <div className="weather-temp-block">
             <span className="weather-icon">{icon}</span>
-            <span className="weather-temp">{data.temperature}°</span>
+            <span className="weather-temp">{displayTemp}°</span>
           </div>
           <div className="weather-info">
             <h2 className="weather-location">{data.location}</h2>
             <p className="weather-condition">{data.condition}</p>
-            <p className="weather-feels">Feels like {data.feels_like}°C</p>
+            <p className="weather-feels">Feels like {displayFeels}{tempUnitSymbol}</p>
           </div>
         </div>
 
@@ -53,7 +60,7 @@ export default function WeatherCard({ data }) {
           <div className="detail-item">
             <span className="detail-icon">💨</span>
             <span className="detail-label">Wind</span>
-            <span className="detail-value">{data.wind_speed} km/h</span>
+            <span className="detail-value">{windObj.val} {windObj.unit}</span>
           </div>
           <div className="detail-item">
             <span className="detail-icon">🌡️</span>

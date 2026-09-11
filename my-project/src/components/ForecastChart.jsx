@@ -4,9 +4,12 @@ const CONDITION_ICONS = {
   'Haze': '🌫️', 'Rain': '🌧️', 'Clouds': '☁️',
 };
 
-export default function ForecastChart({ forecast, days = 7 }) {
+import { useSettings } from '../context/SettingsContext';
+
+export default function ForecastChart({ forecast, days = 7, hideTitle = false }) {
   if (!forecast || forecast.length === 0) return null;
 
+  const { convertTemp } = useSettings();
   const visible = forecast.slice(0, days);
   const maxTemp = Math.max(...visible.map(d => d.temp_max));
   const minTemp = Math.min(...visible.map(d => d.temp_min));
@@ -14,9 +17,11 @@ export default function ForecastChart({ forecast, days = 7 }) {
 
   return (
     <div className="forecast-section">
-      <h3 className="section-title">
-        <span className="section-icon">📅</span> {days}-Day Forecast
-      </h3>
+      {!hideTitle && (
+        <h3 className="section-title">
+          <span className="section-icon">📅</span> {days}-Day Forecast
+        </h3>
+      )}
       <div className="forecast-scroll">
         {visible.map((day, i) => {
           const highPct = ((day.temp_max - minTemp) / range) * 100;
@@ -33,8 +38,8 @@ export default function ForecastChart({ forecast, days = 7 }) {
                   style={{ bottom: `${lowPct}%`, height: `${highPct - lowPct}%` }}
                 />
               </div>
-              <span className="forecast-high">{day.temp_max}°</span>
-              <span className="forecast-low">{day.temp_min}°</span>
+              <span className="forecast-high">{convertTemp(day.temp_max)}°</span>
+              <span className="forecast-low">{convertTemp(day.temp_min)}°</span>
               <div className="forecast-rain">
                 <span className="rain-drop">💧</span>
                 <span>{day.rain_probability}%</span>
