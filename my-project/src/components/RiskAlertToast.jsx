@@ -1,4 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
+import {
+  Info,
+  AlertTriangle,
+  Zap,
+  OctagonAlert,
+  Shield,
+  ShieldAlert,
+  CloudRain,
+  CloudLightning,
+  Wind,
+  Sun,
+  Snowflake,
+  MapPin,
+  X,
+  Bell,
+  ArrowRight,
+} from 'lucide-react';
 
 const SEVERITY_CONFIG = {
   LOW: {
@@ -8,7 +25,7 @@ const SEVERITY_CONFIG = {
     badgeBg: 'rgba(56, 189, 248, 0.2)',
     badgeText: '#bae6fd',
     label: 'Advisory Watch',
-    badgeIcon: 'ℹ️',
+    BadgeIcon: Info,
   },
   MODERATE: {
     color: '#fbbf24',
@@ -17,7 +34,7 @@ const SEVERITY_CONFIG = {
     badgeBg: 'rgba(251, 191, 36, 0.2)',
     badgeText: '#fde68a',
     label: 'Moderate Risk',
-    badgeIcon: '⚠️',
+    BadgeIcon: AlertTriangle,
   },
   HIGH: {
     color: '#f97316',
@@ -26,7 +43,7 @@ const SEVERITY_CONFIG = {
     badgeBg: 'rgba(249, 115, 22, 0.25)',
     badgeText: '#ffedd5',
     label: 'High Alert',
-    badgeIcon: '⚡',
+    BadgeIcon: Zap,
   },
   SEVERE: {
     color: '#ef4444',
@@ -35,7 +52,7 @@ const SEVERITY_CONFIG = {
     badgeBg: 'rgba(239, 68, 68, 0.25)',
     badgeText: '#fee2e2',
     label: 'Severe Warning',
-    badgeIcon: '🚨',
+    BadgeIcon: AlertTriangle,
   },
   EXTREME: {
     color: '#dc2626',
@@ -44,18 +61,28 @@ const SEVERITY_CONFIG = {
     badgeBg: 'rgba(220, 38, 38, 0.35)',
     badgeText: '#ffffff',
     label: 'Extreme Danger',
-    badgeIcon: '🛑',
+    BadgeIcon: OctagonAlert,
   },
 };
 
-function getHazardIcon(type) {
+function HazardIcon({ type, size = 20, color = '#fbbf24' }) {
   const t = (type || '').toLowerCase();
-  if (t.includes('rain') || t.includes('flood') || t.includes('monsoon')) return '🌧️';
-  if (t.includes('thunder') || t.includes('lightning')) return '⛈️';
-  if (t.includes('wind') || t.includes('gale') || t.includes('storm')) return '💨';
-  if (t.includes('heat') || t.includes('warm')) return '☀️';
-  if (t.includes('cold') || t.includes('frost') || t.includes('snow')) return '❄️';
-  return '⚠️';
+  if (t.includes('rain') || t.includes('flood') || t.includes('monsoon')) {
+    return <CloudRain size={size} color={color} />;
+  }
+  if (t.includes('thunder') || t.includes('lightning')) {
+    return <CloudLightning size={size} color={color} />;
+  }
+  if (t.includes('wind') || t.includes('gale') || t.includes('storm')) {
+    return <Wind size={size} color={color} />;
+  }
+  if (t.includes('heat') || t.includes('warm')) {
+    return <Sun size={size} color={color} />;
+  }
+  if (t.includes('cold') || t.includes('frost') || t.includes('snow')) {
+    return <Snowflake size={size} color={color} />;
+  }
+  return <AlertTriangle size={size} color={color} />;
 }
 
 /**
@@ -76,7 +103,7 @@ export default function RiskAlertToast({
   const timerRef = useRef(null);
 
   const cfg = SEVERITY_CONFIG[alert?.severity] || SEVERITY_CONFIG.HIGH;
-  const icon = getHazardIcon(alert?.type);
+  const BadgeIcon = cfg.BadgeIcon;
   const location = alert?.location || 'Current Area';
 
   // Continuous auto-close timer without pausing on hover
@@ -123,12 +150,20 @@ export default function RiskAlertToast({
               background: cfg.badgeBg,
               color: cfg.badgeText,
               borderColor: cfg.color,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
             }}
           >
-            <span className="toast-badge-icon">{cfg.badgeIcon}</span>
+            <span className="toast-badge-icon" style={{ display: 'flex', alignItems: 'center' }}>
+              <BadgeIcon size={13} color={cfg.badgeText} />
+            </span>
             <span>{cfg.label}</span>
           </span>
-          <span className="toast-location-tag">📍 {location}</span>
+          <span className="toast-location-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+            <MapPin size={12} color="rgba(255,255,255,0.7)" />
+            {location}
+          </span>
         </div>
 
         <button
@@ -136,15 +171,18 @@ export default function RiskAlertToast({
           onClick={triggerExit}
           title="Dismiss popup (alert remains saved in notification bell)"
           aria-label="Close alert popup"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          ✕
+          <X size={14} />
         </button>
       </div>
 
       {/* Main Body */}
       <div className="toast-body">
         <div className="toast-title-row">
-          <span className="toast-hazard-icon">{icon}</span>
+          <span className="toast-hazard-icon" style={{ display: 'flex', alignItems: 'center' }}>
+            <HazardIcon type={alert.type} size={20} color={cfg.color} />
+          </span>
           <h4 className="toast-title">{alert.type}</h4>
         </div>
 
@@ -152,7 +190,9 @@ export default function RiskAlertToast({
 
         {alert.recommendation && (
           <div className="toast-protocol-box">
-            <span className="protocol-icon">🛡️</span>
+            <span className="protocol-icon" style={{ display: 'flex', alignItems: 'center' }}>
+              <Shield size={14} color="#38bdf8" />
+            </span>
             <span className="protocol-text">{alert.recommendation}</span>
           </div>
         )}
@@ -167,12 +207,14 @@ export default function RiskAlertToast({
             onOpenPanel?.();
           }}
           title="View all hazards in notification panel"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          <span>🔔 View in Notification Panel</span>
+          <Bell size={13} />
+          <span>View in Notification Panel</span>
           {totalAlerts > 1 && (
             <span className="toast-extra-count">+{totalAlerts - 1} more</span>
           )}
-          <span className="toast-arrow">→</span>
+          <ArrowRight size={13} className="toast-arrow" />
         </button>
 
         <span className="toast-timer-hint">Auto-closing</span>

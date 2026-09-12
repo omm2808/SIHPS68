@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getClimateTrends } from '../api/weatherApi';
+import { TrendingUp, CloudRain, Thermometer, Info } from 'lucide-react';
 
 export default function ClimateTrends({ location }) {
   const [data, setData] = useState(null);
@@ -25,18 +26,24 @@ export default function ClimateTrends({ location }) {
   return (
     <div className="climate-trends">
       <div className="trends-header">
-        <h3 className="section-title">
-          <span className="section-icon">📈</span> Climate Trends — {data.location}
+        <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <TrendingUp size={20} color="#38bdf8" /> Climate Trends — {data.location}
         </h3>
         <div className="trends-toggle">
           <button
             className={`toggle-btn ${mode === 'rainfall' ? 'active' : ''}`}
             onClick={() => setMode('rainfall')}
-          >🌧️ Rainfall</button>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <CloudRain size={14} /> Rainfall
+          </button>
           <button
             className={`toggle-btn ${mode === 'temperature' ? 'active' : ''}`}
             onClick={() => setMode('temperature')}
-          >🌡️ Temperature</button>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Thermometer size={14} /> Temperature
+          </button>
         </div>
       </div>
 
@@ -63,7 +70,9 @@ export default function ClimateTrends({ location }) {
           Total yearly rainfall: <strong>{data.yearly_total_rainfall_mm} mm</strong>
         </p>
       )}
-      <p className="trends-disclaimer">⚠️ {data.data_source}</p>
+      <p className="trends-disclaimer" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Info size={14} color="#38bdf8" /> {data.data_source}
+      </p>
     </div>
   );
 }

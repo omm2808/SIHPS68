@@ -1,16 +1,14 @@
-const CONDITION_ICONS = {
-  'Clear': '☀️',
-  'Partly Cloudy': '⛅',
-  'Cloudy': '☁️',
-  'Light Rain': '🌦️',
-  'Moderate Rain': '🌧️',
-  'Thunderstorm': '⛈️',
-  'Haze': '🌫️',
-  'Rain': '🌧️',
-  'Clouds': '☁️',
-  'Mist': '🌫️',
-  'Drizzle': '🌦️',
-};
+import { useSettings } from '../context/SettingsContext';
+import { WeatherConditionIcon } from '../utils/weatherIcons';
+import {
+  Droplets,
+  Wind as WindIcon,
+  Gauge,
+  Eye,
+  CloudRain,
+  Sunrise,
+  Radio,
+} from 'lucide-react';
 
 const CONDITION_CLASSES = {
   'Clear': 'weather-clear',
@@ -22,14 +20,11 @@ const CONDITION_CLASSES = {
   'Haze': 'weather-haze',
 };
 
-import { useSettings } from '../context/SettingsContext';
-
 export default function WeatherCard({ data }) {
   if (!data) return null;
 
   const { convertTemp, convertWind, tempUnitSymbol } = useSettings();
   const condClass = CONDITION_CLASSES[data.condition] || 'weather-clear';
-  const icon = CONDITION_ICONS[data.condition] || '🌡️';
 
   const displayTemp = convertTemp(data.temperature);
   const displayFeels = convertTemp(data.feels_like);
@@ -41,7 +36,9 @@ export default function WeatherCard({ data }) {
       <div className="weather-card-content">
         <div className="weather-main">
           <div className="weather-temp-block">
-            <span className="weather-icon">{icon}</span>
+            <span className="weather-icon">
+              <WeatherConditionIcon condition={data.condition} size={42} />
+            </span>
             <span className="weather-temp">{displayTemp}°</span>
           </div>
           <div className="weather-info">
@@ -53,32 +50,32 @@ export default function WeatherCard({ data }) {
 
         <div className="weather-details">
           <div className="detail-item">
-            <span className="detail-icon">💧</span>
+            <Droplets size={20} className="detail-icon" color="#38bdf8" />
             <span className="detail-label">Humidity</span>
             <span className="detail-value">{data.humidity}%</span>
           </div>
           <div className="detail-item">
-            <span className="detail-icon">💨</span>
+            <WindIcon size={20} className="detail-icon" color="#a78bfa" />
             <span className="detail-label">Wind</span>
             <span className="detail-value">{windObj.val} {windObj.unit}</span>
           </div>
           <div className="detail-item">
-            <span className="detail-icon">🌡️</span>
+            <Gauge size={20} className="detail-icon" color="#f472b6" />
             <span className="detail-label">Pressure</span>
             <span className="detail-value">{data.pressure} hPa</span>
           </div>
           <div className="detail-item">
-            <span className="detail-icon">👁️</span>
+            <Eye size={20} className="detail-icon" color="#fbbf24" />
             <span className="detail-label">Visibility</span>
             <span className="detail-value">{data.visibility} km</span>
           </div>
           <div className="detail-item">
-            <span className="detail-icon">🌧️</span>
+            <CloudRain size={20} className="detail-icon" color="#60a5fa" />
             <span className="detail-label">Rain</span>
             <span className="detail-value">{data.rain_probability}%</span>
           </div>
           <div className="detail-item">
-            <span className="detail-icon">🌅</span>
+            <Sunrise size={20} className="detail-icon" color="#fb923c" />
             <span className="detail-label">Sunrise</span>
             <span className="detail-value">{(() => {
               const raw = String(data.sunrise || '').trim();
@@ -88,7 +85,6 @@ export default function WeatherCard({ data }) {
                 let h = parseInt(parts[0], 10);
                 let m = parseInt(parts[1], 10);
                 if (isNaN(h) || isNaN(m)) return raw;
-                // If unshifted UTC leaked (00:xx - 02:xx), shift by +5h30m to IST
                 if (h <= 2) {
                   h += 5;
                   m += 30;
@@ -110,8 +106,9 @@ export default function WeatherCard({ data }) {
           const ds = String(data.data_source).toLowerCase();
           const isLive = !ds.includes('mock') && !ds.includes('demo');
           return (
-            <span className={`data-badge ${isLive ? 'badge-real' : 'badge-mock'}`}>
-              {isLive ? '🟢 Live Data' : '🟡 Demo Data'}
+            <span className={`data-badge ${isLive ? 'badge-real' : 'badge-mock'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Radio size={12} />
+              {isLive ? 'Live Data' : 'Demo Data'}
             </span>
           );
         })()}

@@ -13,10 +13,10 @@
   --bg-surface: #0e204c;
 
   /* ── Ultra Frosted Glass Surfaces ── */
-  --card-bg: rgba(14, 30, 68, 0.42);
-  --card-bg-hover: rgba(22, 45, 95, 0.58);
-  --card-bg-solid: rgba(12, 26, 60, 0.88);
-  --card-border: rgba(255, 255, 255, 0.14);
+  --card-bg: rgba(255, 255, 255, 0.08);
+  --card-bg-hover: rgba(255, 255, 255, 0.14);
+  --card-bg-solid: rgba(255, 255, 255, 0.12);
+  --card-border: rgba(255, 255, 255, 0.28);
   --card-border-glow: rgba(56, 189, 248, 0.45);
 
   /* ── Typography & Colors ── */
@@ -44,27 +44,25 @@
   --liquid-glass-bg: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.12) 0%,
-    rgba(255, 255, 255, 0.03) 40%,
-    rgba(15, 35, 80, 0.22) 100%
+    rgba(255, 255, 255, 0.03) 50%,
+    rgba(255, 255, 255, 0.01) 100%
   );
-  --liquid-glass-border: 1px solid rgba(255, 255, 255, 0.42);
+  --liquid-glass-border: 1px solid rgba(255, 255, 255, 0.22);
   --liquid-glass-shadow: 
-    0 24px 60px -10px rgba(0, 0, 0, 0.52),
-    0 8px 24px rgba(0, 0, 0, 0.25),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.8),
-    inset 0 0 20px rgba(255, 255, 255, 0.08),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.2);
-  --liquid-glass-blur: blur(40px) saturate(240%) contrast(104%) brightness(108%);
+    0 16px 40px -8px rgba(0, 0, 0, 0.35),
+    0 4px 16px rgba(0, 0, 0, 0.18),
+    inset 0 0 20px rgba(255, 255, 255, 0.04);
+  --liquid-glass-blur: blur(14px) saturate(150%) brightness(104%);
   
   --liquid-inner-bg: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.09) 0%,
+    rgba(255, 255, 255, 0.08) 0%,
     rgba(255, 255, 255, 0.02) 100%
   );
-  --liquid-inner-border: 1px solid rgba(255, 255, 255, 0.28);
+  --liquid-inner-border: 1px solid rgba(255, 255, 255, 0.18);
   --liquid-inner-shadow: 
-    0 4px 14px rgba(0, 0, 0, 0.18),
-    inset 0 1px 1px rgba(255, 255, 255, 0.55);
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    inset 0 0 12px rgba(255, 255, 255, 0.02);
 }
 
 *, *::before, *::after {

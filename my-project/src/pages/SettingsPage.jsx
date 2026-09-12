@@ -1,5 +1,17 @@
 import { useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import {
+  Settings,
+  Check,
+  Thermometer,
+  Wind,
+  Bell,
+  Volume2,
+  Info,
+  Zap,
+  Globe,
+  Map,
+} from 'lucide-react';
 
 export default function SettingsPage({ onNavigateDashboard }) {
   const {
@@ -22,16 +34,19 @@ export default function SettingsPage({ onNavigateDashboard }) {
     <div className="page settings-page">
       <div className="page-header-row">
         <div>
-          <h1 className="page-title">
-            <span className="page-title-icon">⚙</span> Dashboard Settings
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span className="page-title-icon" style={{ display: 'flex', alignItems: 'center' }}>
+              <Settings size={24} color="#38bdf8" />
+            </span>
+            <span>Dashboard Settings</span>
           </h1>
           <p className="page-subtitle">Customize units, notifications, and weather preferences (synced live to Dashboard)</p>
         </div>
       </div>
 
       {savedBanner && (
-        <div className="settings-live-feedback">
-          <span className="feedback-check">✓</span>
+        <div className="settings-live-feedback" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Check size={16} color="#10b981" />
           <span>{savedBanner}</span>
         </div>
       )}
@@ -40,7 +55,9 @@ export default function SettingsPage({ onNavigateDashboard }) {
         {/* Unit Settings */}
         <div className="settings-card">
           <div className="settings-card-header">
-            <h3 className="settings-card-title">🌡️ Temperature Unit</h3>
+            <h3 className="settings-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Thermometer size={18} color="#f97316" /> Temperature Unit
+            </h3>
             <span className="setting-active-badge">Active: {unit === 'fahrenheit' ? '°F' : '°C'}</span>
           </div>
           <p className="setting-desc">Sets temperature display on Dashboard, Forecast, Popular Cities, and Charts</p>
@@ -63,7 +80,9 @@ export default function SettingsPage({ onNavigateDashboard }) {
         {/* Wind Speed Unit */}
         <div className="settings-card">
           <div className="settings-card-header">
-            <h3 className="settings-card-title">💨 Wind Speed Unit</h3>
+            <h3 className="settings-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Wind size={18} color="#60a5fa" /> Wind Speed Unit
+            </h3>
             <span className="setting-active-badge">Active: {speedUnit}</span>
           </div>
           <p className="setting-desc">Sets wind speed metrics across current weather stats and telemetry</p>
@@ -92,7 +111,9 @@ export default function SettingsPage({ onNavigateDashboard }) {
         {/* Notifications */}
         <div className="settings-card">
           <div className="settings-card-header">
-            <h3 className="settings-card-title">🔔 Severe Weather Notifications</h3>
+            <h3 className="settings-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Bell size={18} color="#fbbf24" /> Severe Weather Notifications
+            </h3>
             <span className={`setting-active-badge ${notifications ? 'badge-on' : 'badge-off'}`}>
               {notifications ? 'Enabled' : 'Disabled'}
             </span>
@@ -111,7 +132,9 @@ export default function SettingsPage({ onNavigateDashboard }) {
         {/* AI Voice Assistant */}
         <div className="settings-card">
           <div className="settings-card-header">
-            <h3 className="settings-card-title">🗣️ WeatherGPT Voice Speed</h3>
+            <h3 className="settings-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Volume2 size={18} color="#a78bfa" /> WeatherGPT Voice Speed
+            </h3>
             <span className="setting-active-badge">Active: {voiceSpeed}</span>
           </div>
           <p className="setting-desc">Controls speech rate when WeatherGPT speaks responses</p>
@@ -139,17 +162,27 @@ export default function SettingsPage({ onNavigateDashboard }) {
 
         {/* About App */}
         <div className="settings-card full-span">
-          <h3 className="settings-card-title">ℹ️ About WeatherSphere</h3>
+          <h3 className="settings-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Info size={18} color="#38bdf8" /> About WeatherSphere
+          </h3>
           <p className="about-text">
             WeatherSphere is a next-generation weather analytics and AI platform featuring real-time
             device geolocation, Leaflet interactive mapping, 10-day meteorological forecasting,
             multilingual WeatherGPT regional voice assistant, and agricultural crop advisory.
           </p>
           <div className="about-badges">
-            <span className="about-badge">⚡ React 19</span>
-            <span className="about-badge">🌐 Open-Meteo Free API</span>
-            <span className="about-badge">🗺️ Leaflet Maps</span>
-            <span className="about-badge">⚙️ Live State Sync</span>
+            <span className="about-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Zap size={12} color="#fbbf24" /> React 19
+            </span>
+            <span className="about-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Globe size={12} color="#38bdf8" /> Open-Meteo Free API
+            </span>
+            <span className="about-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Map size={12} color="#10b981" /> Leaflet Maps
+            </span>
+            <span className="about-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Settings size={12} color="#a78bfa" /> Live State Sync
+            </span>
           </div>
         </div>
       </div>

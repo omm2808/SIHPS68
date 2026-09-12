@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { KNOWN_COORDS, geocodeLocation } from '../utils/knownCoords';
+import { Crosshair, Radio } from 'lucide-react';
 
 const SATELLITE_PROVIDER = {
   base: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -157,8 +158,9 @@ export default function MapView({ coords, locationName, onLocateMe }) {
             if (onLocateMe) onLocateMe();
           }}
           type="button"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          📍
+          <Crosshair size={15} color="#38bdf8" />
         </button>
       </div>
 
@@ -166,9 +168,10 @@ export default function MapView({ coords, locationName, onLocateMe }) {
       <div ref={mapRef} className="map-container" />
 
       {/* Bottom-left location & satellite indicator badge */}
-      <div className="map-label">
+      <div className="map-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
         <span className="map-label-dot" />
-        <span className="map-label-text">🛰️ {displayLocation} (Satellite)</span>
+        <Radio size={12} color="#38bdf8" />
+        <span className="map-label-text">{displayLocation} (Satellite)</span>
       </div>
     </div>
   );

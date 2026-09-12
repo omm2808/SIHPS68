@@ -70,7 +70,7 @@ function App() {
           />
         );
       case 'search':
-        return <SearchPage onNavigateBack={navigateBack} />;
+        return <SearchPage onNavigateBack={navigateBack} onNavigateSettings={() => navigateTo('settings')} />;
       case 'weathergpt':
         return <WeatherGPTPage onNavigateBack={navigateBack} />;
       case 'agriculture':

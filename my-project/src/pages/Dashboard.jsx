@@ -4,6 +4,7 @@ import AlertBanner from '../components/AlertBanner';
 import ForecastChart from '../components/ForecastChart';
 import HourlyTimeline from '../components/HourlyTimeline';
 import useWeather from '../hooks/useWeather';
+import { AlertTriangle } from 'lucide-react';
 
 export default function Dashboard({ location, onLocationChange }) {
   const { current, forecast, hourly, alerts, loading, error } = useWeather(location);
@@ -20,8 +21,9 @@ export default function Dashboard({ location, onLocationChange }) {
       )}
 
       {error && (
-        <div className="page-error">
-          <span>⚠️</span> {error}
+        <div className="page-error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AlertTriangle size={16} color="#ef4444" />
+          <span>{error}</span>
         </div>
       )}
 

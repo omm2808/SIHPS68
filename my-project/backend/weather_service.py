@@ -168,6 +168,23 @@ class RealWeatherProvider(WeatherProvider):
             sunrise = datetime.utcfromtimestamp(sunrise_ts + tz_offset).strftime("%H:%M") if sunrise_ts else "05:45"
             sunset = datetime.utcfromtimestamp(sunset_ts + tz_offset).strftime("%H:%M") if sunset_ts else "18:15"
 
+            weather_id = d["weather"][0]["id"] if d.get("weather") else 800
+            rain_1h = d.get("rain", {}).get("1h", 0) if isinstance(d.get("rain"), dict) else 0
+            rainfall_mm = round(float(rain_1h or 0.0), 1)
+
+            if 200 <= weather_id <= 299:
+                rain_prob = 90
+            elif 300 <= weather_id <= 399:
+                rain_prob = 75
+            elif 500 <= weather_id <= 504:
+                rain_prob = 85
+            elif 511 <= weather_id <= 599:
+                rain_prob = 95
+            elif rainfall_mm > 0:
+                rain_prob = min(100, int(rainfall_mm * 20) + 50)
+            else:
+                rain_prob = 0
+
             return {
                 "location": location.title(),
                 "timestamp": datetime.utcnow().isoformat(),
@@ -179,8 +196,9 @@ class RealWeatherProvider(WeatherProvider):
                 "pressure": d["main"]["pressure"],
                 "visibility": round(d.get("visibility", 10000) / 1000, 1),
                 "condition": d["weather"][0]["main"],
-                "rain_probability": int(d.get("clouds", {}).get("all", 0)),
-                "rainfall_mm": round(d.get("rain", {}).get("1h", 0), 1),
+                "weather_code": weather_id,
+                "rain_probability": rain_prob,
+                "rainfall_mm": rainfall_mm,
                 "sunrise": sunrise,
                 "sunset": sunset,
                 "data_source": "OpenWeatherMap (Live)",

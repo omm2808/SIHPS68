@@ -1,4 +1,20 @@
 import { useState } from 'react';
+import {
+  ShieldCheck,
+  AlertCircle,
+  AlertTriangle,
+  Zap,
+  OctagonAlert,
+  CloudRain,
+  CloudLightning,
+  Wind,
+  Sun,
+  Snowflake,
+  Shield,
+  X,
+  MapPin,
+  BellRing,
+} from 'lucide-react';
 
 const SEVERITY_CONFIG = {
   LOW: {
@@ -9,7 +25,7 @@ const SEVERITY_CONFIG = {
     badgeBg: 'rgba(56, 189, 248, 0.2)',
     badgeText: '#7dd3fc',
     label: 'Advisory',
-    icon: 'ℹ️',
+    icon: AlertCircle,
   },
   MODERATE: {
     color: '#fbbf24',
@@ -19,7 +35,7 @@ const SEVERITY_CONFIG = {
     badgeBg: 'rgba(251, 191, 36, 0.2)',
     badgeText: '#fde68a',
     label: 'Moderate Watch',
-    icon: '⚠️',
+    icon: AlertTriangle,
   },
   HIGH: {
     color: '#f97316',
@@ -29,7 +45,7 @@ const SEVERITY_CONFIG = {
     badgeBg: 'rgba(249, 115, 22, 0.25)',
     badgeText: '#ffedd5',
     label: 'High Alert',
-    icon: '⚡',
+    icon: Zap,
   },
   SEVERE: {
     color: '#ef4444',
@@ -39,7 +55,7 @@ const SEVERITY_CONFIG = {
     badgeBg: 'rgba(239, 68, 68, 0.25)',
     badgeText: '#fee2e2',
     label: 'Severe Warning',
-    icon: '🚨',
+    icon: OctagonAlert,
   },
   EXTREME: {
     color: '#dc2626',
@@ -49,18 +65,18 @@ const SEVERITY_CONFIG = {
     badgeBg: 'rgba(220, 38, 38, 0.35)',
     badgeText: '#ffffff',
     label: 'Extreme Emergency',
-    icon: '🛑',
+    icon: OctagonAlert,
   },
 };
 
-function getAlertIcon(type) {
+function AlertTypeIcon({ type, size = 20, color = '#ffffff' }) {
   const t = (type || '').toLowerCase();
-  if (t.includes('rain') || t.includes('flood') || t.includes('monsoon')) return '🌧️';
-  if (t.includes('thunder') || t.includes('lightning')) return '⛈️';
-  if (t.includes('wind') || t.includes('gale') || t.includes('storm')) return '💨';
-  if (t.includes('heat') || t.includes('warm')) return '☀️';
-  if (t.includes('cold') || t.includes('frost') || t.includes('snow')) return '❄️';
-  return '⚠️';
+  if (t.includes('rain') || t.includes('flood') || t.includes('monsoon')) return <CloudRain size={size} color={color} />;
+  if (t.includes('thunder') || t.includes('lightning')) return <CloudLightning size={size} color={color} />;
+  if (t.includes('wind') || t.includes('gale') || t.includes('storm')) return <Wind size={size} color={color} />;
+  if (t.includes('heat') || t.includes('warm')) return <Sun size={size} color={color} />;
+  if (t.includes('cold') || t.includes('frost') || t.includes('snow')) return <Snowflake size={size} color={color} />;
+  return <AlertTriangle size={size} color={color} />;
 }
 
 export default function AlertBanner({ alerts }) {
@@ -68,26 +84,26 @@ export default function AlertBanner({ alerts }) {
 
   if (dismissed) return null;
 
+  const locationName = alerts?.location || 'Your Region';
+
   if (!alerts || alerts.alert_count === 0 || !alerts.alerts || alerts.alerts.length === 0) {
     return (
       <div className="pro-alert-all-clear">
         <div className="all-clear-glow-dot" />
-        <span className="all-clear-icon">🛡️</span>
+        <ShieldCheck size={20} className="all-clear-icon" color="#34d399" />
         <span className="all-clear-text">
-          No Active Meteorological Warnings — Atmospheric conditions are normal.
+          No Active Meteorological Warnings — Atmospheric conditions in <strong>{locationName}</strong> are normal.
         </span>
       </div>
     );
   }
-
-  const locationName = alerts.location || 'Your Region';
 
   return (
     <div className="pro-alerts-container">
       {/* Alerts Summary Banner Header */}
       <div className="pro-alerts-banner-head">
         <div className="banner-head-left">
-          <span className="pulsing-alert-orb">🚨</span>
+          <BellRing size={22} className="pulsing-alert-orb" color="#ef4444" />
           <div>
             <h4 className="banner-head-title">
               Active Meteorological Warnings & Hazards ({alerts.alert_count})
@@ -105,8 +121,9 @@ export default function AlertBanner({ alerts }) {
             className="alert-dismiss-btn"
             title="Dismiss advisory"
             onClick={() => setDismissed(true)}
+            aria-label="Dismiss alert"
           >
-            ✕
+            <X size={14} />
           </button>
         </div>
       </div>
@@ -115,7 +132,6 @@ export default function AlertBanner({ alerts }) {
       <div className="pro-alerts-cards-list">
         {alerts.alerts.map((alert, i) => {
           const cfg = SEVERITY_CONFIG[alert.severity] || SEVERITY_CONFIG.LOW;
-          const icon = getAlertIcon(alert.type);
 
           return (
             <div
@@ -137,9 +153,14 @@ export default function AlertBanner({ alerts }) {
                 {/* Card Header */}
                 <div className="pro-alert-top-row">
                   <div className="pro-alert-title-wrap">
-                    <span className="pro-alert-icon">{icon}</span>
+                    <span className="pro-alert-icon">
+                      <AlertTypeIcon type={alert.type} color={cfg.color} size={20} />
+                    </span>
                     <h5 className="pro-alert-type">{alert.type}</h5>
-                    <span className="pro-alert-location-pill">📍 {locationName}</span>
+                    <span className="pro-alert-location-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <MapPin size={11} color="#38bdf8" />
+                      {locationName}
+                    </span>
                   </div>
 
                   <div
@@ -165,7 +186,7 @@ export default function AlertBanner({ alerts }) {
                 {alert.recommendation && (
                   <div className="pro-alert-safety-box">
                     <div className="safety-box-header">
-                      <span className="safety-shield-icon">🛡️</span>
+                      <Shield size={15} className="safety-shield-icon" color="#38bdf8" />
                       <span className="safety-box-title">Recommended Safety Protocol</span>
                     </div>
                     <p className="safety-box-instruction">{alert.recommendation}</p>

@@ -2,20 +2,12 @@
 main.py
 --------
 Entry point of the WeatherGPT backend.
-
-An "API endpoint" is just a URL that, when your frontend (or anyone)
-sends a request to it, runs some Python code and returns a JSON
-answer. FastAPI wires each Python function below to a URL using the
-@app.get(...) / @app.post(...) decorators.
-
-Run this file with:  uvicorn main:app --reload --port 8000
-Interactive API docs auto-appear at: http://localhost:8000/docs
 """
 
 import os
 from pathlib import Path
 from datetime import datetime
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -35,6 +27,7 @@ import weather_service
 import ai_service
 import alert_service
 import agriculture_service
+import tts_service
 from schemas import ChatRequest, ChatResponse, AgricultureRequest, AgricultureResponse
 
 DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() == "true"
@@ -242,6 +235,45 @@ async def climate_trends(location: str = "Indore"):
         "monthly_avg_temp_c": monthly_avg_temp,
         "yearly_total_rainfall_mm": round(sum(monthly_rainfall), 1),
     }
+
+
+# -----------------------------------------------------------------
+# Text to Speech (TTS) endpoint — high fidelity regional language audio
+# -----------------------------------------------------------------
+@app.get("/api/tts")
+async def tts_audio_get(text: str = "", lang: str = "en"):
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="text parameter cannot be empty")
+    audio_bytes = await tts_service.generate_tts_audio(text, lang)
+    if not audio_bytes:
+        raise HTTPException(status_code=500, detail="Failed to synthesize speech audio")
+    return Response(
+        content=audio_bytes,
+        media_type="audio/mpeg",
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "Content-Disposition": 'inline; filename="speech.mp3"',
+        },
+    )
+
+
+@app.post("/api/tts")
+async def tts_audio_post(req: dict):
+    text = req.get("text", "")
+    lang = req.get("lang", req.get("language", "en"))
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="text cannot be empty")
+    audio_bytes = await tts_service.generate_tts_audio(text, lang)
+    if not audio_bytes:
+        raise HTTPException(status_code=500, detail="Failed to synthesize speech audio")
+    return Response(
+        content=audio_bytes,
+        media_type="audio/mpeg",
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "Content-Disposition": 'inline; filename="speech.mp3"',
+        },
+    )
 
 
 # -----------------------------------------------------------------

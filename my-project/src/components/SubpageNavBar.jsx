@@ -1,9 +1,19 @@
+import {
+  ArrowLeft,
+  LayoutDashboard,
+  Compass,
+  Bot,
+  Sprout,
+  Settings,
+  FileText,
+} from 'lucide-react';
+
 const PAGE_CONFIG = {
-  home: { label: 'Dashboard', icon: '⊞' },
-  search: { label: 'Search & Maps', icon: '🗺️' },
-  weathergpt: { label: 'WeatherGPT', icon: '🤖' },
-  agriculture: { label: 'Agriculture', icon: '🌾' },
-  settings: { label: 'Settings', icon: '⚙️' },
+  home: { label: 'Dashboard', icon: LayoutDashboard },
+  search: { label: 'Search & Maps', icon: Compass },
+  weathergpt: { label: 'WeatherGPT', icon: Bot },
+  agriculture: { label: 'Agriculture', icon: Sprout },
+  settings: { label: 'Settings', icon: Settings },
 };
 
 /**
@@ -18,8 +28,9 @@ export default function SubpageNavBar({
   onNavigateBack,
   onNavigateHome,
 }) {
-  const current = PAGE_CONFIG[currentPage] || { label: currentPage, icon: '📄' };
+  const current = PAGE_CONFIG[currentPage] || { label: currentPage, icon: FileText };
   const prev = PAGE_CONFIG[previousPage] || PAGE_CONFIG.home;
+  const CurrentIcon = current.icon;
 
   return (
     <header className="subpage-top-nav" role="navigation" aria-label="Page navigation">
@@ -30,7 +41,7 @@ export default function SubpageNavBar({
           onClick={onNavigateBack}
           title={`Return to ${prev.label}`}
         >
-          <span className="back-arrow-icon">←</span>
+          <ArrowLeft size={16} className="back-arrow-icon" />
           <span className="back-button-text">
             Back to <strong className="back-target-name">{prev.label}</strong>
           </span>
@@ -43,12 +54,12 @@ export default function SubpageNavBar({
             onClick={onNavigateHome}
             title="Go to Dashboard Home"
           >
-            <span className="breadcrumb-icon">⊞</span>
+            <LayoutDashboard size={14} className="breadcrumb-icon" />
             <span>Dashboard</span>
           </button>
           <span className="breadcrumb-separator">/</span>
           <span className="breadcrumb-item breadcrumb-current" aria-current="page">
-            <span className="breadcrumb-icon">{current.icon}</span>
+            <CurrentIcon size={14} className="breadcrumb-icon" />
             <span>{current.label}</span>
           </span>
         </nav>

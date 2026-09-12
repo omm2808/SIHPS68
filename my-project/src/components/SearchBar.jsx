@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Search, X, ArrowRight, MapPin } from 'lucide-react';
 
 const CITIES = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Jaipur', 'Ahmedabad', 'Bhopal', 'Indore'];
 
@@ -29,7 +30,7 @@ export default function SearchBar({ value, onChange, onSearch, placeholder }) {
   return (
     <div className="search-bar-wrapper">
       <div className={`search-bar-box ${focused ? 'focused' : ''}`}>
-        <span className="search-bar-icon">🔍</span>
+        <Search size={18} className="search-bar-icon" color="#94a3b8" />
         <input
           type="text"
           className="search-bar-input"
@@ -41,13 +42,13 @@ export default function SearchBar({ value, onChange, onSearch, placeholder }) {
           onKeyDown={e => e.key === 'Enter' && submit()}
         />
         {input && (
-          <button className="search-clear-btn" onClick={() => { setInput(''); setSuggestions([]); }} type="button">
-            ✕
+          <button className="search-clear-btn" onClick={() => { setInput(''); setSuggestions([]); }} type="button" aria-label="Clear search">
+            <X size={14} />
           </button>
         )}
         <button className="search-submit-btn" onClick={() => submit()} aria-label="Search" type="button">
           <span>Search</span>
-          <span className="arrow-icon">→</span>
+          <ArrowRight size={14} className="arrow-icon" />
         </button>
       </div>
 
@@ -55,7 +56,7 @@ export default function SearchBar({ value, onChange, onSearch, placeholder }) {
         <ul className="search-suggestions-dropdown">
           {suggestions.map(c => (
             <li key={c} className="search-suggestion-item" onMouseDown={() => submit(c)}>
-              <span className="suggestion-icon">📍</span>
+              <MapPin size={14} className="suggestion-icon" color="#38bdf8" />
               <span className="suggestion-text">{c}</span>
             </li>
           ))}

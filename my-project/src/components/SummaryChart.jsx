@@ -1,12 +1,16 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
-
-const WMO_ICONS = {
-  0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️',
-  51: '🌦️', 53: '🌦️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️',
-  71: '🌨️', 73: '❄️', 75: '❄️', 80: '🌦️', 81: '🌧️', 82: '⛈️',
-  95: '⛈️', 96: '⛈️', 99: '🌩️',
-};
+import { WeatherConditionIcon } from '../utils/weatherIcons';
+import {
+  Thermometer,
+  Droplets,
+  Wind,
+  Gauge,
+  SunMedium,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 
 const WMO_LABELS = {
   0: 'Clear Sky', 1: 'Mainly Clear', 2: 'Partly Cloudy', 3: 'Overcast',
@@ -60,28 +64,27 @@ export default function SummaryChart({ hourlyData, currentData, dailyData }) {
         const temp = convertTemp(rawC);
         const rainPct = Math.round(hourlyData.precipitation_probability?.[idx] ?? 60);
         const code = hourlyData.weather_code?.[idx] ?? 63;
-        const icon = WMO_ICONS[code] || '🌧️';
         const label = WMO_LABELS[code] || 'Rain';
         const isToday = timeObj.toDateString() === now.toDateString();
         const fullDate = isToday
           ? 'Today'
           : timeObj.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
         const windRaw = hourlyData.wind_speed_10m?.[idx] ?? 10;
-        points.push({ timeLabel, temp, rainPct, icon, label, fullDate, windRaw, timeObj });
+        points.push({ timeLabel, temp, rainPct, code, label, fullDate, windRaw, timeObj });
       }
       return points;
     }
     return [
-      { timeLabel: 'Now',   temp: convertTemp(27), rainPct: 98,  icon: '🌧️', label: 'Rain',         fullDate: 'Today', windRaw: 12 },
-      { timeLabel: '12 PM', temp: convertTemp(27), rainPct: 100, icon: '🌧️', label: 'Heavy Rain',    fullDate: 'Today', windRaw: 14 },
-      { timeLabel: '2 PM',  temp: convertTemp(27), rainPct: 100, icon: '🌧️', label: 'Rain',         fullDate: 'Today', windRaw: 11 },
-      { timeLabel: '4 PM',  temp: convertTemp(27), rainPct: 100, icon: '🌧️', label: 'Rain',         fullDate: 'Today', windRaw: 10 },
-      { timeLabel: '6 PM',  temp: convertTemp(27), rainPct: 93,  icon: '🌦️', label: 'Rain Showers', fullDate: 'Today', windRaw: 9  },
-      { timeLabel: '8 PM',  temp: convertTemp(26), rainPct: 75,  icon: '🌦️', label: 'Drizzle',      fullDate: 'Today', windRaw: 8  },
-      { timeLabel: '10 PM', temp: convertTemp(26), rainPct: 75,  icon: '🌦️', label: 'Drizzle',      fullDate: 'Today', windRaw: 7  },
-      { timeLabel: '12 AM', temp: convertTemp(26), rainPct: 76,  icon: '🌦️', label: 'Drizzle',      fullDate: 'Tomorrow', windRaw: 8 },
-      { timeLabel: '2 AM',  temp: convertTemp(25), rainPct: 76,  icon: '⛅',  label: 'Partly Cloudy',fullDate: 'Tomorrow', windRaw: 6 },
-      { timeLabel: '4 AM',  temp: convertTemp(25), rainPct: 78,  icon: '⛅',  label: 'Partly Cloudy',fullDate: 'Tomorrow', windRaw: 5 },
+      { timeLabel: 'Now',   temp: convertTemp(27), rainPct: 98,  code: 63, label: 'Rain',         fullDate: 'Today', windRaw: 12 },
+      { timeLabel: '12 PM', temp: convertTemp(27), rainPct: 100, code: 65, label: 'Heavy Rain',    fullDate: 'Today', windRaw: 14 },
+      { timeLabel: '2 PM',  temp: convertTemp(27), rainPct: 100, code: 63, label: 'Rain',         fullDate: 'Today', windRaw: 11 },
+      { timeLabel: '4 PM',  temp: convertTemp(27), rainPct: 100, code: 63, label: 'Rain',         fullDate: 'Today', windRaw: 10 },
+      { timeLabel: '6 PM',  temp: convertTemp(27), rainPct: 93,  code: 80, label: 'Rain Showers', fullDate: 'Today', windRaw: 9  },
+      { timeLabel: '8 PM',  temp: convertTemp(26), rainPct: 75,  code: 51, label: 'Drizzle',      fullDate: 'Today', windRaw: 8  },
+      { timeLabel: '10 PM', temp: convertTemp(26), rainPct: 75,  code: 51, label: 'Drizzle',      fullDate: 'Today', windRaw: 7  },
+      { timeLabel: '12 AM', temp: convertTemp(26), rainPct: 76,  code: 51, label: 'Drizzle',      fullDate: 'Tomorrow', windRaw: 8 },
+      { timeLabel: '2 AM',  temp: convertTemp(25), rainPct: 76,  code: 2,  label: 'Partly Cloudy',fullDate: 'Tomorrow', windRaw: 6 },
+      { timeLabel: '4 AM',  temp: convertTemp(25), rainPct: 78,  code: 2,  label: 'Partly Cloudy',fullDate: 'Tomorrow', windRaw: 5 },
     ];
   }, [hourlyData, convertTemp]);
 
@@ -233,17 +236,19 @@ export default function SummaryChart({ hourlyData, currentData, dailyData }) {
                 }}
               >
                 <div className="sc-tooltip-header">
-                  <span className="sc-tooltip-icon">{hoveredPoint.icon}</span>
+                  <span className="sc-tooltip-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <WeatherConditionIcon code={hoveredPoint.code} size={16} />
+                  </span>
                   <span className="sc-tooltip-time">{hoveredPoint.timeLabel}</span>
                   <span className="sc-tooltip-date">{hoveredPoint.fullDate}</span>
                 </div>
                 <div className="sc-tooltip-body">
                   <div className="sc-tooltip-row">
-                    <span>🌡️</span>
+                    <Thermometer size={13} color="#f97316" />
                     <span>{hoveredPoint.temp}{tempUnitSymbol}</span>
                   </div>
                   <div className="sc-tooltip-row">
-                    <span>💧</span>
+                    <Droplets size={13} color="#38bdf8" />
                     <span>Rain {hoveredPoint.rainPct}%</span>
                   </div>
                   <div className="sc-tooltip-row sc-tooltip-cond">
@@ -392,7 +397,9 @@ export default function SummaryChart({ hourlyData, currentData, dailyData }) {
                   className={`rain-col ${idx === hoverIndex ? 'active' : ''}`}
                   onMouseEnter={() => setHoverIndex(idx)}
                 >
-                  <span className="rain-icon">{p.icon}</span>
+                  <span className="rain-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <WeatherConditionIcon code={p.code} size={15} />
+                  </span>
                   <span className="rain-val">{p.rainPct}%</span>
                 </div>
               ))}
@@ -422,20 +429,24 @@ export default function SummaryChart({ hourlyData, currentData, dailyData }) {
         <div className="hourly-tab-content tab-fade-in">
           <div className="hourly-slider-wrapper">
             <button className="slider-arrow-btn prev" onClick={() => slideHourly('left')} aria-label="Slide Left">
-              ‹
+              <ChevronLeft size={16} />
             </button>
             <div className="hourly-scroll-list" ref={hourlyScrollRef}>
               {chartPoints.map((p, i) => (
                 <div key={i} className="hourly-chip">
                   <span className="h-time">{p.timeLabel}</span>
-                  <span className="h-icon">{p.icon}</span>
+                  <span className="h-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <WeatherConditionIcon code={p.code} size={22} />
+                  </span>
                   <span className="h-temp">{p.temp}{tempUnitSymbol}</span>
-                  <span className="h-rain">💧 {p.rainPct}%</span>
+                  <span className="h-rain" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    <Droplets size={11} color="#38bdf8" /> {p.rainPct}%
+                  </span>
                 </div>
               ))}
             </div>
             <button className="slider-arrow-btn next" onClick={() => slideHourly('right')} aria-label="Slide Right">
-              ›
+              <ChevronRight size={16} />
             </button>
           </div>
         </div>
@@ -446,15 +457,17 @@ export default function SummaryChart({ hourlyData, currentData, dailyData }) {
         <div className="details-tab-content tab-fade-in">
           <div className="details-grid">
             {[
-              { icon: '💧', label: 'Humidity',    val: `${currentData?.relative_humidity_2m ?? currentData?.humidity ?? 88}%` },
-              { icon: '💨', label: 'Wind', val: (() => { const w = convertWind(currentData?.wind_speed_10m ?? currentData?.wind_speed ?? 13); return `${w.val} ${w.unit}`; })() },
-              { icon: '🌊', label: 'Pressure',    val: `${currentData?.surface_pressure ?? currentData?.pressure ?? 1012} hPa` },
-              { icon: '☀️', label: 'UV Index',    val: `${currentData?.uv_index ?? 3}` },
-              { icon: '🌡️', label: 'Feels Like',  val: `${convertTemp(currentData?.apparent_temperature ?? currentData?.feels_like ?? 24)}${tempUnitSymbol}` },
-              { icon: '👁️', label: 'Visibility',  val: `${currentData?.visibility ?? 10} km` },
-            ].map(({ icon, label, val }) => (
+              { Icon: Droplets, color: '#38bdf8', label: 'Humidity',    val: `${currentData?.relative_humidity_2m ?? currentData?.humidity ?? 88}%` },
+              { Icon: Wind, color: '#60a5fa', label: 'Wind', val: (() => { const w = convertWind(currentData?.wind_speed_10m ?? currentData?.wind_speed ?? 13); return `${w.val} ${w.unit}`; })() },
+              { Icon: Gauge, color: '#a78bfa', label: 'Pressure',    val: `${currentData?.surface_pressure ?? currentData?.pressure ?? 1012} hPa` },
+              { Icon: SunMedium, color: '#fbbf24', label: 'UV Index',    val: `${currentData?.uv_index ?? 3}` },
+              { Icon: Thermometer, color: '#f97316', label: 'Feels Like',  val: `${convertTemp(currentData?.apparent_temperature ?? currentData?.feels_like ?? 24)}${tempUnitSymbol}` },
+              { Icon: Eye, color: '#34d399', label: 'Visibility',  val: `${currentData?.visibility ?? 10} km` },
+            ].map(({ Icon, color, label, val }) => (
               <div key={label} className="detail-item">
-                <span className="d-icon">{icon}</span>
+                <span className="d-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  <Icon size={18} color={color} />
+                </span>
                 <span className="d-label">{label}</span>
                 <span className="d-val">{val}</span>
               </div>

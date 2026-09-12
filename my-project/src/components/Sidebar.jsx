@@ -1,11 +1,19 @@
 import { useState } from 'react';
+import {
+  LayoutDashboard,
+  Compass,
+  Bot,
+  Sprout,
+  Settings,
+  CloudSun,
+} from 'lucide-react';
 
 const NAV_ITEMS = [
-  { key: 'home', icon: '⊞', label: 'Dashboard', desc: 'Current Location' },
-  { key: 'search', icon: '🗺️', label: 'Search & Maps', desc: 'Explore Places' },
-  { key: 'weathergpt', icon: '🤖', label: 'WeatherGPT', desc: 'AI Voice & Chat' },
-  { key: 'agriculture', icon: '🌾', label: 'Agriculture', desc: 'Crop Advisory' },
-  { key: 'settings', icon: '⚙️', label: 'Settings', desc: 'Preferences' },
+  { key: 'home', icon: LayoutDashboard, label: 'Dashboard', desc: 'Current Location' },
+  { key: 'search', icon: Compass, label: 'Search & Maps', desc: 'Explore Places' },
+  { key: 'weathergpt', icon: Bot, label: 'WeatherGPT', desc: 'AI Voice & Chat' },
+  { key: 'agriculture', icon: Sprout, label: 'Agriculture', desc: 'Crop Advisory' },
+  { key: 'settings', icon: Settings, label: 'Settings', desc: 'Preferences' },
 ];
 
 export default function Sidebar({ activePage, onNavigate }) {
@@ -26,7 +34,7 @@ export default function Sidebar({ activePage, onNavigate }) {
           title="WeatherSphere Dashboard"
         >
           <div className="sidebar-logo-icon-wrap">
-            <span className="logo-icon">⛅</span>
+            <CloudSun size={22} color="#ffffff" />
           </div>
           <div className="sidebar-logo-brand">
             <span className="sidebar-logo-text">WeatherSphere</span>
@@ -46,7 +54,7 @@ export default function Sidebar({ activePage, onNavigate }) {
                 title={!hovered ? item.label : ''}
                 aria-current={isActive ? 'page' : undefined}
               >
-                <span className="nav-btn-icon">{item.icon}</span>
+                <item.icon size={20} className="nav-btn-icon" />
                 <div className="nav-btn-text">
                   <span className="nav-btn-title">{item.label}</span>
                   <span className="nav-btn-desc">{item.desc}</span>

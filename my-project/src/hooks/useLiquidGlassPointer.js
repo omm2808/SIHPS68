@@ -54,6 +54,14 @@ export function useLiquidGlassPointer() {
       '.gpt-tts-toggle-btn',
       '.crop-tag',
       '.about-badge',
+      '.app-sidebar',
+      '.search-dropdown-menu',
+      '.gpt-lang-dropdown-menu',
+      '.detail-item',
+      '.weather-details .detail-item',
+      '.sidebar-nav-btn',
+      '.summary-tab-btn',
+      '.pill-btn',
     ].join(', ');
 
     const updatePointer = () => {

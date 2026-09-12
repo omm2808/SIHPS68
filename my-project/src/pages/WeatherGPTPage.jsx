@@ -1,19 +1,44 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { sendChat } from '../api/weatherApi';
+import { useSettings } from '../context/SettingsContext';
+import {
+  speakText as ttsSpeak,
+  stopSpeaking as ttsStop,
+  REGIONAL_LANG_SPEECH_MAP,
+} from '../utils/ttsEngine';
+import {
+  Bot,
+  User,
+  Volume2,
+  VolumeX,
+  Globe,
+  ChevronDown,
+  Check,
+  Radio,
+  Square,
+  MapPin,
+  Lightbulb,
+  Mic,
+  MicOff,
+  Send,
+  Loader2,
+  XCircle,
+  Languages,
+} from 'lucide-react';
 
 const LANGUAGES = [
-  { code: 'en', label: 'English', native: 'English', flag: '🇬🇧' },
-  { code: 'hi', label: 'Hindi', native: 'हिन्दी', flag: '🇮🇳' },
-  { code: 'or', label: 'Odia', native: 'ଓଡ଼ିଆ', flag: '🐘' },
-  { code: 'bn', label: 'Bengali', native: 'বাংলা', flag: '🐯' },
-  { code: 'ta', label: 'Tamil', native: 'தமிழ்', flag: '🌴' },
-  { code: 'te', label: 'Telugu', native: 'తెలుగు', flag: '🌿' },
-  { code: 'mr', label: 'Marathi', native: 'मराठी', flag: '🏛️' },
-  { code: 'gu', label: 'Gujarati', native: 'ગુજરાતી', flag: '🦁' },
-  { code: 'kn', label: 'Kannada', native: 'ಕನ್ನಡ', flag: '🦅' },
-  { code: 'pa', label: 'Punjabi', native: 'ਪੰਜਾਬੀ', flag: '🌾' },
-  { code: 'ml', label: 'Malayalam', native: 'മലയാളം', flag: '🌴' },
-  { code: 'ur', label: 'Urdu', native: 'اردو', flag: '🌙' },
+  { code: 'en', label: 'English', native: 'English' },
+  { code: 'hi', label: 'Hindi', native: 'हिन्दी' },
+  { code: 'or', label: 'Odia', native: 'ଓଡ଼ିଆ' },
+  { code: 'bn', label: 'Bengali', native: 'বাংলা' },
+  { code: 'ta', label: 'Tamil', native: 'தமிழ்' },
+  { code: 'te', label: 'Telugu', native: 'తెలుగు' },
+  { code: 'mr', label: 'Marathi', native: 'मराठी' },
+  { code: 'gu', label: 'Gujarati', native: 'ગુજરાતી' },
+  { code: 'kn', label: 'Kannada', native: 'ಕನ್ನಡ' },
+  { code: 'pa', label: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
+  { code: 'ml', label: 'Malayalam', native: 'മലയാളം' },
+  { code: 'ur', label: 'Urdu', native: 'اردو' },
 ];
 
 const QUICK_PROMPTS = {
@@ -24,32 +49,19 @@ const QUICK_PROMPTS = {
   ta: ['சென்னையில் வானிலை எப்படி?', 'நாளை மழை பெய்யுமா?', 'இந்த பருவத்திற்கான சிறந்த பயிர்கள்?', 'வானிலை எச்சரிக்கைகள்?'],
   te: ['హైదరాబాద్‌లో వాతావరణం ఎలా ఉంది?', 'రేపు వర్షం పడుతుందా?', 'ఈ సీజన్‌లో ఉత్తమ పంటలు ఏవి?'],
   mr: ['मुंबईत हवामान कसे आहे?', 'उद्या पाऊस पडेल का?', 'या हंगामातील पिके कोणती?'],
-  gu: ['અમદાવાદમાં હવામાન કેવું છે?', 'કાલે વરસાદ પડશે?', 'આ સિઝનમાં કયા પાક વાવવા?'],
+  gu: ['અમદાવાદમાં हवाમાન કેવું છે?', 'કાલે વરસાદ પડશે?', 'આ સિઝનમાં કયા પાક વાવવા?'],
   kn: ['ಬೆಂಗಳೂರಿನಲ್ಲಿ ಹವಾಮಾನ ಹೇಗಿದೆ?', 'ನಾಳೆ ಮಳೆ ಬರುತ್ತದೆಯೇ?', 'ಈ ಋತುವಿನ ಅತ್ಯುತ್ತಮ ಬೆಳೆಗಳು?'],
   pa: ['ਲੁਧਿਆਣਾ ਵਿੱਚ ਮੌਸਮ ਕਿਵੇਂ ਹੈ?', 'ਕੀ ਕੱਲ੍ਹ ਮੀਂਹ ਪਵੇਗਾ?', 'ਇਸ ਸੀਜ਼ਨ ਦੀਆਂ ਵਧੀਆ ਫ਼ਸਲਾਂ?'],
-  ml: ['കൊച്ചിയിലെ കാലാവസ്ഥ എങ്ങനെയുണ്ട്?', 'நாളെ മഴ പെയ്യുമോ?', 'ഈ സീസണിലെ മികച്ച വിളകൾ?'],
+  ml: ['കൊച്ചിയിലെ കാലാവസ്ഥ എങ്ങനെയുണ്ട്?', 'നാളെ മഴ പെയ്യുമോ?', 'ഈ സീസണിലെ മികച്ച വിളകൾ?'],
   ur: ['دہلی میں موسم کیسا ہے؟', 'کیا کل بارش ہوگی؟', 'اس موسم کے لیے بہترین فصلیں؟'],
 };
 
-function cleanTextForSpeech(text) {
-  if (!text) return '';
-  return text
-    .replace(/[*#_~`>]/g, '')
-    .replace(/(\d+)\s*°\s*C\b/gi, '$1 degrees Celsius')
-    .replace(/(\d+)\s*°\s*F\b/gi, '$1 degrees Fahrenheit')
-    .replace(/°/g, ' degrees ')
-    .replace(/km\/h/gi, 'kilometers per hour')
-    .replace(/hPa/gi, 'hectopascals')
-    .replace(/%/g, ' percent')
-    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F000}-\u{1F2FF}\u{1F680}-\u{1F6FF}]/gu, '')
-    .trim();
-}
-
 export default function WeatherGPTPage() {
+  const { voiceSpeed } = useSettings();
   const [messages, setMessages] = useState([
     {
       role: 'bot',
-      text: '🌤️ Namaste! I\'m WeatherGPT — your multilingual AI weather assistant.\n\nAsk me anything about live weather, forecasts, or agricultural crop advice in your preferred regional language!',
+      text: 'Namaste! I\'m WeatherGPT — your multilingual AI weather assistant.\n\nAsk me anything about live weather, forecasts, or agricultural crop advice in your preferred regional language!',
     },
   ]);
   const [input, setInput] = useState('');
@@ -81,12 +93,10 @@ export default function WeatherGPTPage() {
     return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
-  // Cleanup speech synthesis on unmount
+  // Stop any speaking on unmount
   useEffect(() => {
     return () => {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      ttsStop();
     };
   }, []);
 
@@ -112,21 +122,8 @@ export default function WeatherGPTPage() {
   // Update language for speech recognition
   useEffect(() => {
     if (!recognition) return;
-    const langMap = {
-      en: 'en-IN',
-      hi: 'hi-IN',
-      ta: 'ta-IN',
-      te: 'te-IN',
-      mr: 'mr-IN',
-      bn: 'bn-IN',
-      kn: 'kn-IN',
-      gu: 'gu-IN',
-      pa: 'pa-IN',
-      ml: 'ml-IN',
-      or: 'or-IN',
-      ur: 'ur-PK',
-    };
-    recognition.lang = langMap[language] || 'en-IN';
+    const langConfig = REGIONAL_LANG_SPEECH_MAP[language] || REGIONAL_LANG_SPEECH_MAP.en;
+    recognition.lang = langConfig.bcp47;
   }, [language, recognition]);
 
   const toggleVoice = () => {
@@ -140,73 +137,37 @@ export default function WeatherGPTPage() {
     }
   };
 
-  // Text to Speech Function
+  // Text to Speech Function using universal TTS Engine
   const speakText = useCallback((text, langCode = language, msgIndex = null) => {
-    if (!('speechSynthesis' in window)) return;
+    ttsSpeak(text, langCode, {
+      speed: voiceSpeed || 'normal',
+      onStart: () => {
+        setIsSpeaking(true);
+        setSpeakingMsgIndex(msgIndex);
+      },
+      onEnd: () => {
+        setIsSpeaking(false);
+        setSpeakingMsgIndex(null);
+      },
+      onError: (err) => {
+        console.warn('TTS speech execution error:', err);
+        setIsSpeaking(false);
+        setSpeakingMsgIndex(null);
+      },
+    });
+  }, [language, voiceSpeed]);
 
-    window.speechSynthesis.cancel();
-
-    const clean = cleanTextForSpeech(text);
-    if (!clean) return;
-
-    const utterance = new SpeechSynthesisUtterance(clean);
-
-    const langMap = {
-      en: 'en-IN',
-      hi: 'hi-IN',
-      ta: 'ta-IN',
-      te: 'te-IN',
-      mr: 'mr-IN',
-      bn: 'bn-IN',
-      kn: 'kn-IN',
-      gu: 'gu-IN',
-      pa: 'pa-IN',
-      ml: 'ml-IN',
-      or: 'hi-IN',
-      ur: 'ur-PK',
-    };
-
-    const targetLang = langMap[langCode] || 'en-IN';
-    utterance.lang = targetLang;
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-
-    const voices = window.speechSynthesis.getVoices();
-    const matchingVoice = voices.find(
-      (v) =>
-        v.lang === targetLang ||
-        v.lang.startsWith(langCode) ||
-        v.lang.toLowerCase().includes(langCode)
-    );
-    if (matchingVoice) {
-      utterance.voice = matchingVoice;
-    }
-
-    utterance.onstart = () => {
-      setIsSpeaking(true);
-      setSpeakingMsgIndex(msgIndex);
-    };
-
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      setSpeakingMsgIndex(null);
-    };
-
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      setSpeakingMsgIndex(null);
-    };
-
-    window.speechSynthesis.speak(utterance);
-  }, [language]);
-
-  const stopSpeaking = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+  const stopSpeaking = useCallback(() => {
+    ttsStop();
     setIsSpeaking(false);
     setSpeakingMsgIndex(null);
-  };
+  }, []);
+
+  const changeLanguage = useCallback((code) => {
+    stopSpeaking();
+    setLanguage(code);
+    setIsDropdownOpen(false);
+  }, [stopSpeaking]);
 
   const send = useCallback(async () => {
     const msg = input.trim();
@@ -227,13 +188,13 @@ export default function WeatherGPTPage() {
       setMessages((prev) => [...prev, newBotMsg]);
 
       // Automatically speak the AI response when autoTts is enabled
-      if (autoTts && 'speechSynthesis' in window) {
-        speakText(res.reply, language);
+      if (autoTts) {
+        speakText(res.reply, language, null);
       }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: 'bot', text: `❌ ${err.message}`, error: true },
+        { role: 'bot', text: `Error: ${err.message}`, error: true },
       ]);
     } finally {
       setLoading(false);
@@ -249,8 +210,11 @@ export default function WeatherGPTPage() {
       <div className="gpt-header-container">
         <div className="page-header-row">
           <div>
-            <h1 className="page-title">
-              <span className="page-title-icon">🤖</span> WeatherGPT
+            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span className="page-title-icon" style={{ display: 'flex', alignItems: 'center' }}>
+                <Bot size={26} color="#38bdf8" />
+              </span>
+              <span>WeatherGPT</span>
             </h1>
             <p className="page-subtitle">
               Multilingual real-time weather & crop advisory assistant
@@ -267,14 +231,19 @@ export default function WeatherGPTPage() {
               }}
               title="Toggle automatic AI voice response"
               type="button"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
-              <span className="gpt-tts-icon">{autoTts ? '🔊' : '🔈'}</span>
+              <span className="gpt-tts-icon" style={{ display: 'flex', alignItems: 'center' }}>
+                {autoTts ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              </span>
               <span className="gpt-tts-label">Voice: {autoTts ? 'ON' : 'OFF'}</span>
             </button>
 
             {/* Option Selector Dropdown Structure */}
             <div className="gpt-lang-select-wrapper" ref={dropdownRef}>
-              <span className="gpt-lang-select-label">🌐 Language:</span>
+              <span className="gpt-lang-select-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <Globe size={14} /> Language:
+              </span>
 
               {/* Custom Select Trigger Button */}
               <button
@@ -283,24 +252,25 @@ export default function WeatherGPTPage() {
                 type="button"
                 aria-haspopup="listbox"
                 aria-expanded={isDropdownOpen}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
               >
-                <span className="gpt-lang-flag">{activeLang.flag}</span>
+                <Languages size={15} color="#38bdf8" />
                 <span className="gpt-lang-text">
                   <strong>{activeLang.native}</strong> ({activeLang.label})
                 </span>
-                <span className="gpt-lang-arrow">▾</span>
+                <ChevronDown size={14} className="gpt-lang-arrow" />
               </button>
 
               {/* Native Select fallback for accessibility */}
               <select
                 className="gpt-native-select"
                 value={language}
-                onChange={(e) => setLanguage(e.target.value)}
+                onChange={(e) => changeLanguage(e.target.value)}
                 aria-label="Language selector options"
               >
                 {LANGUAGES.map((lang) => (
                   <option key={lang.code} value={lang.code}>
-                    {lang.flag} {lang.native} — {lang.label}
+                    {lang.native} — {lang.label}
                   </option>
                 ))}
               </select>
@@ -310,7 +280,9 @@ export default function WeatherGPTPage() {
                 <div className="gpt-lang-dropdown-menu">
                   <div className="gpt-lang-dropdown-header">
                     <span>Available Languages</span>
-                    <span className="gpt-lang-badge-real">🟢 Live Data Grounded</span>
+                    <span className="gpt-lang-badge-real" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Radio size={10} color="#10b981" /> Live Data Grounded
+                    </span>
                   </div>
                   <div className="gpt-lang-options-grid">
                     {LANGUAGES.map((lang) => {
@@ -320,17 +292,14 @@ export default function WeatherGPTPage() {
                           key={lang.code}
                           type="button"
                           className={`gpt-lang-option-card ${isSelected ? 'selected' : ''}`}
-                          onClick={() => {
-                            setLanguage(lang.code);
-                            setIsDropdownOpen(false);
-                          }}
+                          onClick={() => changeLanguage(lang.code)}
                         >
-                          <span className="gpt-opt-flag">{lang.flag}</span>
+                          <Languages size={16} color={isSelected ? '#38bdf8' : 'rgba(255,255,255,0.6)'} />
                           <div className="gpt-opt-info">
                             <span className="gpt-opt-native">{lang.native}</span>
                             <span className="gpt-opt-label">{lang.label}</span>
                           </div>
-                          {isSelected && <span className="gpt-opt-check">✓</span>}
+                          {isSelected && <Check size={14} className="gpt-opt-check" color="#38bdf8" />}
                         </button>
                       );
                     })}
@@ -358,9 +327,16 @@ export default function WeatherGPTPage() {
                 key={i}
                 className={`chat-msg ${m.role} ${m.error ? 'error' : ''} ${isThisSpeaking ? 'msg-speaking' : ''}`}
               >
-                <div className="msg-avatar">{m.role === 'bot' ? '🤖' : '👤'}</div>
+                <div className="msg-avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {m.role === 'bot' ? <Bot size={18} color="#38bdf8" /> : <User size={18} color="#a78bfa" />}
+                </div>
                 <div className="msg-body">
                   <div className="msg-header-row">
+                    {m.error && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ef4444', marginRight: '6px' }}>
+                        <XCircle size={14} />
+                      </span>
+                    )}
                     <p className="msg-text" style={{ whiteSpace: 'pre-wrap' }}>
                       {m.text}
                     </p>
@@ -376,8 +352,9 @@ export default function WeatherGPTPage() {
                         }}
                         title={isThisSpeaking ? 'Stop voice' : 'Listen to response'}
                         type="button"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
-                        {isThisSpeaking ? '⏹️' : '🔊'}
+                        {isThisSpeaking ? <Square size={13} /> : <Volume2 size={13} />}
                       </button>
                     )}
                   </div>
@@ -386,20 +363,22 @@ export default function WeatherGPTPage() {
                     <div className="msg-meta">
                       {m.intent && <span className="meta-badge intent">{m.intent}</span>}
                       {m.location && (
-                        <span className="meta-badge location">
-                          📍 {m.location}
+                        <span className="meta-badge location" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <MapPin size={11} /> {m.location}
                         </span>
                       )}
                       {m.source && (
                         <span
                           className={`meta-badge source ${isLive ? 'live' : 'demo'}`}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}
                         >
-                          {isLive ? '🟢 Live Data' : '🟡 Demo Mode'}
+                          <Radio size={10} />
+                          {isLive ? 'Live Data' : 'Demo Mode'}
                         </span>
                       )}
                       {isThisSpeaking && (
-                        <span className="meta-badge speaking-indicator">
-                          🔊 Speaking…
+                        <span className="meta-badge speaking-indicator" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Volume2 size={11} className="animate-pulse" /> Speaking…
                         </span>
                       )}
                     </div>
@@ -411,7 +390,9 @@ export default function WeatherGPTPage() {
 
           {loading && (
             <div className="chat-msg bot">
-              <div className="msg-avatar">🤖</div>
+              <div className="msg-avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Bot size={18} color="#38bdf8" />
+              </div>
               <div className="msg-body">
                 <div className="typing-bubble">
                   <span className="typing-dot" />
@@ -435,8 +416,10 @@ export default function WeatherGPTPage() {
               className="gpt-speaking-stop-btn"
               onClick={stopSpeaking}
               type="button"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
-              ⏹️ Stop Voice
+              <Square size={13} />
+              <span>Stop Voice</span>
             </button>
           </div>
         )}
@@ -444,7 +427,10 @@ export default function WeatherGPTPage() {
         {/* Quick Prompts Suggestions */}
         {messages.length <= 2 && (
           <div className="quick-prompts-wrapper">
-            <div className="quick-prompts-title">💡 Suggested Questions in {activeLang.native}</div>
+            <div className="quick-prompts-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Lightbulb size={16} color="#fbbf24" />
+              <span>Suggested Questions in {activeLang.native}</span>
+            </div>
             <div className="quick-prompts-list">
               {quickPrompts.map((p, i) => (
                 <button
@@ -472,8 +458,9 @@ export default function WeatherGPTPage() {
                 : 'Voice not supported'
             }
             disabled={!recognition}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            {isListening ? '🔴' : '🎙️'}
+            {isListening ? <MicOff size={18} color="#ef4444" /> : <Mic size={18} />}
           </button>
           <input
             ref={inputRef}
@@ -489,8 +476,9 @@ export default function WeatherGPTPage() {
             className="gpt-send-btn"
             onClick={send}
             disabled={loading || !input.trim()}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            {loading ? '⏳' : '➤'}
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </button>
         </div>
 

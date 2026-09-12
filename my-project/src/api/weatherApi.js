@@ -66,5 +66,9 @@ export const getAgricultureAdvisory = (crop, location, language = 'en') =>
 export const getClimateTrends = (location = 'Indore') =>
   request(`/climate/trends?location=${encodeURIComponent(location)}`);
 
+// ── TTS Audio ───────────────────────────────────────────
+export const getTtsAudioUrl = (text, language = 'en') =>
+  `/api/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(language)}`;
+
 // ── Admin ───────────────────────────────────────────────
 export const getAdminStats = () => request('/admin/stats');

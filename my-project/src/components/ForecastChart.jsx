@@ -1,10 +1,6 @@
-const CONDITION_ICONS = {
-  'Clear': '☀️', 'Partly Cloudy': '⛅', 'Cloudy': '☁️',
-  'Light Rain': '🌦️', 'Moderate Rain': '🌧️', 'Thunderstorm': '⛈️',
-  'Haze': '🌫️', 'Rain': '🌧️', 'Clouds': '☁️',
-};
-
 import { useSettings } from '../context/SettingsContext';
+import { WeatherConditionIcon } from '../utils/weatherIcons';
+import { Calendar, Droplets } from 'lucide-react';
 
 export default function ForecastChart({ forecast, days = 7, hideTitle = false }) {
   if (!forecast || forecast.length === 0) return null;
@@ -19,19 +15,20 @@ export default function ForecastChart({ forecast, days = 7, hideTitle = false })
     <div className="forecast-section">
       {!hideTitle && (
         <h3 className="section-title">
-          <span className="section-icon">📅</span> {days}-Day Forecast
+          <Calendar size={16} className="section-icon" color="#38bdf8" /> {days}-Day Forecast
         </h3>
       )}
       <div className="forecast-scroll">
         {visible.map((day, i) => {
           const highPct = ((day.temp_max - minTemp) / range) * 100;
           const lowPct = ((day.temp_min - minTemp) / range) * 100;
-          const icon = CONDITION_ICONS[day.condition] || '🌡️';
 
           return (
             <div className="forecast-day" key={day.date || i} style={{ animationDelay: `${i * 0.06}s` }}>
               <span className="forecast-dayname">{i === 0 ? 'Today' : day.day_name?.slice(0, 3)}</span>
-              <span className="forecast-icon">{icon}</span>
+              <span className="forecast-icon">
+                <WeatherConditionIcon condition={day.condition} size={20} />
+              </span>
               <div className="forecast-bar-track">
                 <div
                   className="forecast-bar"
@@ -41,7 +38,7 @@ export default function ForecastChart({ forecast, days = 7, hideTitle = false })
               <span className="forecast-high">{convertTemp(day.temp_max)}°</span>
               <span className="forecast-low">{convertTemp(day.temp_min)}°</span>
               <div className="forecast-rain">
-                <span className="rain-drop">💧</span>
+                <Droplets size={10} color="#60a5fa" />
                 <span>{day.rain_probability}%</span>
               </div>
             </div>
